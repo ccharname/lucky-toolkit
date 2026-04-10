@@ -1,3 +1,10 @@
+/* ===== Lucky Toolkit CSS variables ===== */
+.theme-light, .theme-dark {
+  --lucky-accent-warm: light-dark(#E8873A, #ED9A52);
+  --lucky-accent-warm-bg: light-dark(rgba(232, 135, 58, 0.1), rgba(237, 154, 82, 0.15));
+  --lucky-accent-warm-border: light-dark(rgba(232, 135, 58, 0.3), rgba(237, 154, 82, 0.3));
+}
+
 /* =============================================================================
    Lucky Toolkit — styles.css 目录
    =============================================================================
@@ -539,6 +546,7 @@ body.lucky-hide-vault:not(.is-mobile) .workspace-split.mod-left-split .workspace
   background: var(--background-modifier-hover);
   line-height: 1;
   vertical-align: middle;
+  font-variant-numeric: tabular-nums;
 }
 
 .lucky-note-count:empty {
@@ -604,17 +612,17 @@ body.lucky-hide-vault:not(.is-mobile) .workspace-split.mod-left-split .workspace
 .lucky-cal-today-btn {
   font-size: 11px;
   font-weight: 600;
-  color: light-dark(#E8873A, #ED9A52);
+  color: var(--lucky-accent-warm);
   height: 24px;
   padding: 0 8px;
   border-radius: 12px;
-  border: 1px solid light-dark(rgba(232,135,58,0.3), rgba(237,154,82,0.3));
+  border: 1px solid var(--lucky-accent-warm-border);
   white-space: nowrap;
 }
 
 .lucky-cal-today-btn:hover {
-  background: light-dark(rgba(232,135,58,0.1), rgba(237,154,82,0.15));
-  color: light-dark(#E8873A, #ED9A52);
+  background: var(--lucky-accent-warm-bg);
+  color: var(--lucky-accent-warm);
 }
 
 .lucky-cal-today-btn.is-current-month {
@@ -667,7 +675,7 @@ body.lucky-hide-vault:not(.is-mobile) .workspace-split.mod-left-split .workspace
 }
 
 .lucky-cal-weekend-header {
-  color: light-dark(#8E8E93, #636366);
+  color: var(--text-muted);
 }
 
 /* --- Week number gutter --- */
@@ -712,12 +720,12 @@ body.lucky-hide-vault:not(.is-mobile) .workspace-split.mod-left-split .workspace
 
 /* Weekend text — soft rose */
 .lucky-cal-weekend {
-  color: light-dark(#8E8E93, #8E8E93);
+  color: var(--text-muted);
 }
 
 /* Adjacent month days */
 .lucky-cal-adjacent {
-  opacity: 0.25;
+  opacity: 0.35;
   font-weight: 300;
 }
 
@@ -727,23 +735,46 @@ body.lucky-hide-vault:not(.is-mobile) .workspace-split.mod-left-split .workspace
 
 /* Future */
 .lucky-cal-future {
-  opacity: 0.22;
+  opacity: 0.4;
 }
 
-/* --- Today (warm orange circle) --- */
+/* --- Today: warm orange circle with pulse ring --- */
 .lucky-cal-today {
   background: light-dark(#E8873A, #ED9A52);
   color: #FFFFFF;
   font-weight: 700;
   border-radius: 50%;
   opacity: 1;
-  box-shadow: 0 1px 3px light-dark(rgba(232, 135, 58, 0.3), rgba(237, 154, 82, 0.35));
   transform: none;
+  box-shadow:
+    0 1px 3px light-dark(rgba(232, 135, 58, 0.3), rgba(237, 154, 82, 0.35)),
+    0 0 0 0 light-dark(rgba(232, 135, 58, 0.35), rgba(237, 154, 82, 0.4));
+  animation: lucky-cal-today-pulse 2s ease-in-out infinite;
 }
 
 .lucky-cal-today:hover {
   background: light-dark(#D47830, #F0A868);
-  box-shadow: 0 2px 6px light-dark(rgba(232, 135, 58, 0.4), rgba(237, 154, 82, 0.45));
+  animation-play-state: paused;
+  box-shadow:
+    0 2px 6px light-dark(rgba(232, 135, 58, 0.4), rgba(237, 154, 82, 0.45)),
+    0 0 0 6px light-dark(rgba(232, 135, 58, 0.18), rgba(237, 154, 82, 0.22));
+}
+
+@keyframes lucky-cal-today-pulse {
+  0%, 100% {
+    box-shadow:
+      0 1px 3px light-dark(rgba(232, 135, 58, 0.3), rgba(237, 154, 82, 0.35)),
+      0 0 0 0 light-dark(rgba(232, 135, 58, 0.35), rgba(237, 154, 82, 0.4));
+  }
+  50% {
+    box-shadow:
+      0 1px 4px light-dark(rgba(232, 135, 58, 0.4), rgba(237, 154, 82, 0.45)),
+      0 0 0 8px light-dark(rgba(232, 135, 58, 0.0), rgba(237, 154, 82, 0.0));
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .lucky-cal-today { animation: none; }
 }
 
 /* --- Heatmap (GitHub green) --- */
@@ -782,6 +813,32 @@ body.lucky-hide-vault:not(.is-mobile) .workspace-split.mod-left-split .workspace
   color: light-dark(hsl(130, 50%, 25%), hsl(130, 30%, 80%));
 }
 
+/* --- Selected day (user click): blue accent ring via ::after ---
+   Use pseudo-element so it doesn't conflict with today's pulse animation */
+.lucky-cal-selected {
+  z-index: 1;
+}
+
+.lucky-cal-selected::after {
+  content: "";
+  position: absolute;
+  inset: -2px;
+  border: 2px solid var(--interactive-accent);
+  border-radius: 50%;
+  pointer-events: none;
+}
+
+/* When selected overlaps today: inset the ring so it sits inside the orange circle */
+.lucky-cal-today.lucky-cal-selected::after {
+  inset: 2px;
+  border-color: light-dark(rgba(255, 255, 255, 0.85), rgba(255, 255, 255, 0.9));
+}
+
+/* Selected on adjacent month: stronger opacity so the ring remains visible */
+.lucky-cal-adjacent.lucky-cal-selected {
+  opacity: 0.7;
+}
+
 /* --- Footer --- */
 .lucky-cal-footer {
   display: flex;
@@ -789,7 +846,7 @@ body.lucky-hide-vault:not(.is-mobile) .workspace-split.mod-left-split .workspace
   gap: 8px;
   padding: 8px 0 4px;
   font-size: 10px;
-  color: light-dark(#8E8E93, #8E8E93);
+  color: var(--text-faint);
   border-top: 1px solid var(--background-modifier-border);
   margin-top: 6px;
   letter-spacing: 0.02em;
@@ -803,9 +860,20 @@ body.lucky-hide-vault:not(.is-mobile) .workspace-split.mod-left-split .workspace
 /* ===== Feature 7: Reading Time ===== */
 
 .lucky-reading-time {
-  font-size: 11px;
-  color: var(--text-faint);
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  color: var(--text-muted);
   padding: 0 8px;
+}
+.lucky-reading-time-icon {
+  display: inline-flex;
+  align-items: center;
+}
+.lucky-reading-time-icon svg {
+  width: 13px;
+  height: 13px;
 }
 
 /* ===== Feature 8: Focus Mode ===== */

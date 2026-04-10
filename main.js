@@ -101,11 +101,14 @@ class LuckyToolkit extends Plugin {
     // --- Feature 7: Reading Time ---
     this.readingTimeEl = this.addStatusBarItem();
     this.readingTimeEl.addClass('lucky-reading-time');
+    const iconSpan = this.readingTimeEl.createSpan({ cls: 'lucky-reading-time-icon' });
+    setIcon(iconSpan, 'clock');
+    this.readingTimeTextEl = this.readingTimeEl.createSpan({ cls: 'lucky-reading-time-text' });
     this.registerEvent(
       this.app.workspace.on('active-leaf-change', () => this.updateReadingTime())
     );
     this.registerEvent(
-      this.app.workspace.on('editor-change', debounce(() => { this._readingTimeDirty = true; this.updateReadingTime(); }, 500, true))
+      this.app.workspace.on('editor-change', debounce(() => { this._readingTimeDirty = true; this.updateReadingTime(); }, 800, true))
     );
     this.app.workspace.onLayoutReady(() => this.updateReadingTime());
 
@@ -339,6 +342,8 @@ class LuckyToolkit extends Plugin {
     // Register context menu on the tag pane via DOM event delegation
     // Approach inspired by tag-wrangler: listen for contextmenu on .tag-pane-tag elements
     this.registerDomEvent(document, 'contextmenu', (evt) => {
+      if (!(evt.target instanceof HTMLElement)) return;
+      if (!evt.target.closest('.tag-pane-tag')) return;
       if (!this.settings.enableTagWrangler) return;
 
       const tagEl = evt.target.closest('.tag-pane-tag');
@@ -583,12 +588,12 @@ class LuckyToolkit extends Plugin {
 
   updateReadingTime() {
     if (!this.settings.showReadingTime) {
-      this.readingTimeEl.setText('');
+      this.readingTimeTextEl.setText('');
       return;
     }
     const file = this.app.workspace.getActiveFile();
     if (!file || file.extension !== 'md') {
-      this.readingTimeEl.setText('');
+      this.readingTimeTextEl.setText('');
       this._readingTimeCache = null;
       return;
     }
@@ -603,10 +608,10 @@ class LuckyToolkit extends Plugin {
       const englishWords = text.replace(/[\u4e00-\u9fff]/g, '').split(/\s+/).filter(w => w.length > 0).length;
       const minutes = Math.ceil(chineseChars / 400 + englishWords / 200);
       const display = minutes < 1 ? '< 1 min' : minutes + ' min';
-      this.readingTimeEl.setText(display);
+      this.readingTimeTextEl.setText(display);
       this._readingTimeCache = { path: file.path };
     }).catch(() => {
-      this.readingTimeEl.setText('');
+      this.readingTimeTextEl.setText('');
       this._readingTimeCache = null;
     });
   }
@@ -654,6 +659,7 @@ class LuckyCalendarView extends ItemView {
     this.plugin = plugin;
     this.currentMonth = window.moment();
     this.dailyNotes = {};
+    this.selectedDate = null;
   }
 
   getViewType() { return CALENDAR_VIEW_TYPE; }
@@ -767,36 +773,40 @@ class LuckyCalendarView extends ItemView {
           const prevDay = prevMonthDays - (startDay - 1 - dow);
           const prevDateStr = prevMonth.format('YYYY-MM') + '-' + String(prevDay).padStart(2, '0');
           const dayEl = grid.createEl('div', { cls: 'lucky-cal-day lucky-cal-adjacent', text: String(prevDay) });
+          dayEl.setAttribute('data-date', prevDateStr);
           if (dow >= 6) dayEl.addClass('lucky-cal-weekend');
           const prevHeat = this.getHeatLevel(prevDateStr);
           if (prevHeat > 0) {
             dayEl.setAttribute('data-heat', String(prevHeat));
             dayEl.addClass('lucky-cal-has-note');
           }
-          dayEl.addEventListener('click', () => this.openOrCreateNote(prevDateStr));
+          if (prevDateStr === this.selectedDate) dayEl.addClass('lucky-cal-selected');
         } else if (currentDay > daysInMonth) {
           // Next month's leading days
           const nextDay = currentDay - daysInMonth;
           const nextMonth = month.clone().add(1, 'month');
           const nextDateStr = nextMonth.format('YYYY-MM') + '-' + String(nextDay).padStart(2, '0');
           const dayEl = grid.createEl('div', { cls: 'lucky-cal-day lucky-cal-adjacent', text: String(nextDay) });
+          dayEl.setAttribute('data-date', nextDateStr);
           if (dow >= 6) dayEl.addClass('lucky-cal-weekend');
           const nextHeat = this.getHeatLevel(nextDateStr);
           if (nextHeat > 0) {
             dayEl.setAttribute('data-heat', String(nextHeat));
             dayEl.addClass('lucky-cal-has-note');
           }
-          dayEl.addEventListener('click', () => this.openOrCreateNote(nextDateStr));
+          if (nextDateStr === this.selectedDate) dayEl.addClass('lucky-cal-selected');
           currentDay++;
         } else {
           const dateStr = month.format('YYYY-MM') + '-' + String(currentDay).padStart(2, '0');
           const dayEl = grid.createEl('div', { cls: 'lucky-cal-day', text: String(currentDay) });
+          dayEl.setAttribute('data-date', dateStr);
 
           if (dow >= 6) dayEl.addClass('lucky-cal-weekend');
 
           if (dateStr === todayStr) {
             dayEl.addClass('lucky-cal-today');
           }
+          if (dateStr === this.selectedDate) dayEl.addClass('lucky-cal-selected');
 
           const heat = this.getHeatLevel(dateStr);
           if (heat > 0) {
@@ -808,11 +818,22 @@ class LuckyCalendarView extends ItemView {
             dayEl.addClass('lucky-cal-future');
           }
 
-          dayEl.addEventListener('click', () => this.openOrCreateNote(dateStr));
           currentDay++;
         }
       }
     }
+
+    // === Grid click delegation ===
+    grid.addEventListener('click', (e) => {
+      const cell = e.target.closest('.lucky-cal-day');
+      if (!cell) return;
+      const dateStr = cell.getAttribute('data-date');
+      if (!dateStr) return;
+      this.selectedDate = dateStr;
+      grid.querySelectorAll('.lucky-cal-selected').forEach(el => el.removeClass('lucky-cal-selected'));
+      cell.addClass('lucky-cal-selected');
+      this.openOrCreateNote(dateStr);
+    });
 
     // === Month stats footer ===
     const monthPrefix = month.format('YYYY-MM');
@@ -1241,24 +1262,37 @@ class LuckyFileExplorer extends ItemView {
       const container = this.containerEl.querySelector('.lucky-fe-tree');
       if (!container) return;
 
-      // Remove previous highlight
-      container.querySelectorAll('.lucky-fe-file.is-active').forEach((el) => el.removeClass('is-active'));
+      if (!activeFile) {
+        // Remove previous highlight when no active file
+        container.querySelectorAll('.lucky-fe-file.is-active').forEach((el) => el.removeClass('is-active'));
+        return;
+      }
 
-      if (!activeFile) return;
+      const escaped = CSS.escape(activeFile.path);
+      const existing = container.querySelector(`.lucky-fe-file[data-path="${escaped}"]`);
 
-      // Add highlight to active file
-      const activeEl = container.querySelector(`.lucky-fe-file[data-path="${CSS.escape(activeFile.path)}"]`);
-      if (activeEl) {
-        activeEl.addClass('is-active');
-      } else {
-        // Auto-expand parent folders to reveal active file
-        let parent = activeFile.parent;
-        while (parent && parent.path !== '/') {
-          this.expandedFolders.add(parent.path);
-          parent = parent.parent;
-        }
-        // Re-render to show the file
-        this.renderTree(container);
+      if (existing) {
+        // Fast path: DOM already present — only toggle class
+        container.querySelectorAll('.lucky-fe-file.is-active').forEach((el) => el.removeClass('is-active'));
+        existing.addClass('is-active');
+        existing.scrollIntoView({ block: 'nearest' });
+        return;
+      }
+
+      // Slow path: ancestor folder not expanded — expand then re-render once
+      let parent = activeFile.parent;
+      while (parent && parent.path !== '/') {
+        this.expandedFolders.add(parent.path);
+        parent = parent.parent;
+      }
+      this.renderTree();
+      // Re-query and mark after render (renderTree's own highlightActiveFile call
+      // returns early due to _highlighting guard, so we do it here)
+      const newEl = container.querySelector(`.lucky-fe-file[data-path="${escaped}"]`);
+      if (newEl) {
+        container.querySelectorAll('.lucky-fe-file.is-active').forEach((el) => el.removeClass('is-active'));
+        newEl.addClass('is-active');
+        newEl.scrollIntoView({ block: 'nearest' });
       }
     } finally {
       this._highlighting = false;
