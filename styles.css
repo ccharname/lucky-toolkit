@@ -1,0 +1,1548 @@
+/* =============================================================================
+   Lucky Toolkit — styles.css 目录
+   =============================================================================
+
+   BEAUTIFY（body.lucky-beautify 控制）
+     @settings .............. Style Settings 配置面板
+     §1  Core Variables ..... 字体栈·标题缩放·配色方案
+     §2  Font Application ... 字体作用域隔离
+     §3  Typography ......... 字号·行高·段距·内链·阅读宽度
+     §4  Blockquote/Callout . 杂志引用块·精简 Callout
+     §5  Tables ............. 斑马纹·全宽
+     §6  Code Blocks ........ 左侧强调线·语言标签·行号背景
+     §7  Headings ........... 层级背景·尺寸·高亮当前行
+     §8  Utilities .......... 列表标记·行内代码·标签·图片·性能
+     §9  CJK Typography ..... 标点挤压·首行缩进
+
+   PLUGIN FEATURES（常驻）
+     Feature 1  Hider ....... 隐藏滚动条·属性·仓库名
+     Feature 3  Note Count .. 文件夹笔记计数徽章
+     Feature 4  Tag Wrangler  标签管理弹窗
+     Feature 5  Calendar .... 月历热力图
+     Feature 7  Reading Time  阅读时间状态栏
+     Feature 8  Focus Mode .. 焦点模式淡化
+     Feature 11 Explorer美化  原生文件管理器增强
+     Feature 12 File List ... 自定义文件列表视图
+     Daily Note Callout ..... 系统日志压缩
+
+   TASK STATUS（常驻）
+     Checkbox Appearance .... 五状态 checkbox 填色+图标
+     Text Styling ........... 状态文本颜色·删除线
+     Source View ............ 编辑视图行颜色
+
+   MOBILE（常驻）
+     Calendar/File List ..... 字体·触摸区域·行号隐藏
+     Focus/Callout/Badge .... 焦点禁用·字号放大
+
+   ============================================================================= */
+
+/* @settings
+name: charnamev8 (Minimal Baked)
+id: charnamev8
+version: 8.0.0
+updated: 2026-04-01
+author: AntiGravity / User
+description: v8.0 极简重构
+settings:
+    -
+        id: builtin-info
+        title: 📋 内置常驻功能（无需开关）
+        description: "**默认字体:** JetBrainsMono Nerd Font Mono + HarmonyOS Sans · **内置功能:** 杂志风引用块 · 统一 Callout · 表格斑马纹+全宽 · 代码块增强(左侧强调线+语言标签) · 标题背景层级(H1强调色 / H2侧边条 / H3-H6淡灰) · 高亮当前行 · 行内代码加粗 · 几何列表标记 · Clutter-free Headings · 图片圆角阴影 · 五状态待办 Checkbox（✗完成·>推迟·-取消·/进行中·!重要） · 内链 hover 动效 · 暗色自适应(light-dark) · 段落防孤行(text-wrap pretty) · 标题均匀换行(text-wrap balance) · 长文档延迟渲染(content-visibility)"
+        type: info-text
+        markdown: true
+    -
+        id: enable-font-smoothing
+        title: 开启字体渲染优化 (Font Smoothing)
+        description: 开启抗锯齿，使字体显示更细腻平滑
+        type: class-toggle
+        default: false
+    -
+        id: body-font-size-custom
+        title: 正文字体大小 (Body Font Size)
+        description: 默认 19px
+        type: variable-number-slider
+        default: 19
+        min: 12
+        max: 28
+        step: 1
+        format: px
+    -
+        id: reading-line-height-body
+        title: 正文行高 (Body Line Height)
+        type: variable-number
+        default: 1.6
+        min: 1.4
+        max: 2.0
+        step: 0.05
+    -
+        id: reading-line-height-heading
+        title: 标题行高 (Heading Line Height)
+        type: variable-number
+        default: 1.2
+        min: 1.0
+        max: 1.5
+        step: 0.05
+    -
+        id: reading-max-width
+        title: 阅读区域最大宽度 (Reading Width)
+        description: 默认 700px
+        type: variable-number-slider
+        default: 700
+        min: 500
+        max: 1200
+        step: 50
+        format: px
+    -
+        id: feature-cjk-typography
+        title: 中文排版优化 (CJK Typography)
+        description: 标点挤压
+        type: class-toggle
+        default: false
+    -
+        id: feature-cjk-indent
+        title: 中文首行缩进 (CJK First-line Indent)
+        description: 段落首行缩进两个字符
+        type: class-toggle
+        default: false
+
+*/
+
+/* =============================================================================
+   § 1 · Core Variables
+   ============================================================================= */
+
+body.lucky-beautify {
+    --font-stack-code: 'JetBrainsMono Nerd Font Mono', 'Maple Mono', 'Menlo', ui-monospace, SFMono-Regular, monospace;
+    --font-text: 'JetBrainsMono Nerd Font Mono', 'HarmonyOS Sans';
+    font-synthesis: none;
+
+    /* Major Third heading scale */
+    --h1-size: 1.6em;
+    --h2-size: 1.35em;
+    --h3-size: 1.15em;
+    --h4-size: 1.0em;
+    --h5-size: 0.9em;
+    --h6-size: 0.85em;
+
+    /* light-dark() ready */
+    color-scheme: light dark;
+}
+
+/* Mobile: iOS native fonts (JetBrainsMono/HarmonyOS not installed) */
+body.is-mobile.lucky-beautify {
+    --font-stack-code: 'Menlo', ui-monospace, SFMono-Regular, monospace;
+    --font-text: -apple-system, 'PingFang SC', 'SF Pro Text', system-ui, sans-serif;
+}
+
+body.lucky-beautify.enable-font-smoothing {
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+}
+
+/* =============================================================================
+   § 2 · Font Application (scoped isolation, always-on)
+   ============================================================================= */
+
+body.lucky-beautify :is(.markdown-source-view, .markdown-rendered) {
+    --font-text-override: var(--font-text);
+    --font-monospace: var(--font-stack-code);
+    --font-monospace-override: var(--font-stack-code);
+    letter-spacing: -0.01em;
+}
+
+/* =============================================================================
+   § 3 · Typography (always-on)
+   ============================================================================= */
+
+/* Font size */
+body.lucky-beautify :is(.markdown-source-view .cm-scroller, .markdown-rendered) {
+    font-size: var(--body-font-size-custom, 19px);
+}
+
+/* Line height & spacing */
+body.lucky-beautify :is(.markdown-source-view, .markdown-rendered) {
+    --line-height-normal: var(--reading-line-height-body, 1.6);
+}
+
+body.lucky-beautify :is(.markdown-source-view, .markdown-rendered) p {
+    margin-bottom: 1.2rem;
+    line-height: var(--reading-line-height-body, 1.6);
+    text-wrap: pretty;
+}
+
+body.lucky-beautify :is(.markdown-source-view, .markdown-rendered) :is(ul, ol) {
+    line-height: 1.55;
+}
+
+body.lucky-beautify :is(.markdown-source-view, .markdown-rendered) li {
+    margin-bottom: 0.35em;
+}
+
+body.lucky-beautify :is(.markdown-source-view, .markdown-rendered) :is(pre, code) {
+    font-family: var(--font-monospace);
+    line-height: 1.45;
+}
+
+/* Internal link hover animation (baked-in) */
+body.lucky-beautify :is(.markdown-source-view, .markdown-rendered) a.internal-link {
+    text-decoration: none;
+    border-bottom: 1px solid var(--text-accent);
+    transition: border-bottom-width 0.2s ease, background-color 0.2s ease, opacity 0.2s ease;
+    opacity: 0.9;
+}
+
+body.lucky-beautify :is(.markdown-source-view, .markdown-rendered) a.internal-link:hover {
+    background-color: hsla(var(--interactive-accent-hsl), 0.1);
+    border-bottom-width: 2px;
+    opacity: 1;
+}
+
+/* Reading width */
+body.lucky-beautify .markdown-reading-view .markdown-preview-sizer {
+    max-width: var(--reading-max-width, 700px);
+}
+
+/* =============================================================================
+   § 4 · Blockquote & Callout (baked-in)
+   ============================================================================= */
+
+/* Magazine blockquote */
+body.lucky-beautify :is(.markdown-source-view, .markdown-rendered) blockquote {
+    margin-left: 0;
+    margin-right: 0;
+    padding: 0.8em 1.2em;
+    border-left: 4px solid var(--interactive-accent);
+    background-color: light-dark(var(--background-secondary), rgba(var(--mono-rgb-100), 0.05));
+    border-radius: 4px;
+    color: var(--text-muted);
+    font-style: italic;
+    border-top: none;
+    border-right: none;
+    border-bottom: none;
+}
+
+/* Refined callouts */
+body.lucky-beautify .callout {
+    border: none;
+    border-left: 4px solid rgb(var(--callout-color));
+    background-color: light-dark(rgba(var(--callout-color), 0.05), rgba(var(--callout-color), 0.08));
+    border-radius: 4px;
+    padding: 1em 1em 1em 1.2em;
+}
+
+body.lucky-beautify .callout-title {
+    background-color: transparent;
+    padding-top: 0;
+}
+
+body.lucky-beautify .callout-content {
+    background-color: transparent;
+}
+
+/* =============================================================================
+   § 5 · Tables (baked-in)
+   ============================================================================= */
+
+/* Zebra stripes */
+body.lucky-beautify :is(.markdown-rendered, .markdown-source-view) :is(th, td) {
+    padding: 10px 14px;
+}
+
+body.lucky-beautify :is(.markdown-rendered, .markdown-source-view) tr:nth-child(even) {
+    background-color: var(--background-secondary);
+}
+
+/* Full-width tables */
+body.lucky-beautify :is(table, .markdown-source-view.mod-cm6 .cm-table-widget .table-wrapper) {
+    width: 100%;
+}
+
+/* =============================================================================
+   § 6 · Code Blocks (baked-in)
+   ============================================================================= */
+
+body.lucky-beautify :is(.markdown-source-view, .markdown-rendered) pre {
+    border-left: 3px solid var(--interactive-accent);
+    border-radius: 6px;
+    overflow: hidden;
+    contain: content;
+}
+
+body.lucky-beautify :is(.markdown-source-view, .markdown-rendered) pre > code {
+    font-size: 0.85em;
+    line-height: 1.5;
+}
+
+body.lucky-beautify .markdown-rendered pre code::before {
+    content: attr(class);
+    display: block;
+    padding: 4px 12px;
+    margin: -0.5em -1em 0.5em -1em;
+    background-color: light-dark(rgba(var(--mono-rgb-100), 0.06), rgba(var(--mono-rgb-100), 0.03));
+    font-size: 0.75em;
+    color: var(--text-muted);
+    font-family: var(--font-monospace);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    border-bottom: 1px solid var(--background-modifier-border);
+}
+
+body.lucky-beautify .cm-gutters {
+    background-color: rgba(var(--mono-rgb-100), 0.03);
+    border-right: 1px solid var(--background-modifier-border);
+}
+
+/* =============================================================================
+   § 7 · Headings (baked-in)
+   ============================================================================= */
+
+/* Heading base */
+body.lucky-beautify :is(.markdown-source-view, .markdown-rendered) :is(h1, h2, h3, h4, h5, h6),
+body.lucky-beautify :is(.cm-header-1, .cm-header-2, .cm-header-3, .cm-header-4, .cm-header-5, .cm-header-6) {
+    line-height: var(--reading-line-height-heading, 1.2);
+    margin-top: 1.2em;
+    margin-bottom: 0.6em;
+    padding: 0.2em 0.5em 0.2em 0;
+    letter-spacing: -0.02em;
+    color: var(--text-normal);
+    border-radius: 6px;
+    text-wrap: balance;
+    text-rendering: optimizeLegibility;
+}
+
+/* Heading sizes */
+body.lucky-beautify :is(.markdown-source-view, .markdown-rendered) h1,
+body.lucky-beautify .cm-header-1 { font-size: var(--h1-size); }
+
+body.lucky-beautify :is(.markdown-source-view, .markdown-rendered) h2,
+body.lucky-beautify .cm-header-2 { font-size: var(--h2-size); }
+
+body.lucky-beautify :is(.markdown-source-view, .markdown-rendered) h3,
+body.lucky-beautify .cm-header-3 { font-size: var(--h3-size); }
+
+body.lucky-beautify :is(.markdown-source-view, .markdown-rendered) h4,
+body.lucky-beautify .cm-header-4 { font-size: var(--h4-size); }
+
+body.lucky-beautify :is(.markdown-source-view, .markdown-rendered) h5,
+body.lucky-beautify .cm-header-5 { font-size: var(--h5-size); }
+
+body.lucky-beautify :is(.markdown-source-view, .markdown-rendered) h6,
+body.lucky-beautify .cm-header-6 { font-size: var(--h6-size); }
+
+/* H1: accent tint bg + fit-content */
+body.lucky-beautify :is(.markdown-source-view, .markdown-rendered) h1,
+body.lucky-beautify .cm-header-1 {
+    background: light-dark(hsla(var(--interactive-accent-hsl), 0.12), hsla(var(--interactive-accent-hsl), 0.08));
+    width: fit-content;
+}
+
+/* H2: grey tint + left accent bar + fit-content */
+body.lucky-beautify :is(.markdown-source-view, .markdown-rendered) h2,
+body.lucky-beautify .cm-header-2 {
+    background: light-dark(rgba(100, 100, 100, 0.1), rgba(100, 100, 100, 0.06));
+    border-left: 4px solid var(--interactive-accent);
+    border-top-left-radius: 2px;
+    border-bottom-left-radius: 2px;
+    width: fit-content;
+}
+
+/* H3-H6: subtle grey + fit-content */
+body.lucky-beautify :is(.markdown-source-view, .markdown-rendered) :is(h3, h4, h5, h6),
+body.lucky-beautify :is(.cm-header-3, .cm-header-4, .cm-header-5, .cm-header-6) {
+    background: light-dark(rgba(120, 120, 120, 0.05), rgba(120, 120, 120, 0.03));
+    color: var(--text-muted);
+    width: fit-content;
+}
+
+/* Active line highlight */
+body.lucky-beautify .cm-active.cm-line {
+    background-color: light-dark(hsla(50, 100%, 50%, 0.1), hsla(50, 60%, 50%, 0.06));
+    transition: background-color 0.2s ease;
+}
+
+/* =============================================================================
+   § 8 · Utilities (all baked-in)
+   ============================================================================= */
+
+/* Clutter-free headings */
+body.lucky-beautify div.mod-cm6.is-live-preview div:not(.cm-active).cm-line .cm-header~span.cm-header::before,
+body.lucky-beautify div.mod-cm6.is-live-preview div:not(.cm-active).cm-line .cm-header.cm-hmd-internal-link::before {
+    display: none;
+}
+
+body.lucky-beautify div:not(.cm-active).cm-line span:not(.cm-formatting-header):not(.cm-hashtag):not(.cm-inline-code):not(.cm-highlight).cm-header::before {
+    font-size: 0.6rem;
+    width: auto;
+    margin-right: 4px;
+    padding: 1px 3px;
+    border-radius: 4px;
+    background-color: var(--background-secondary-alt);
+    color: var(--text-muted);
+    overflow: visible;
+    font-family: var(--font-monospace);
+    font-weight: normal;
+    vertical-align: middle;
+}
+
+body.lucky-beautify div:not(.cm-active).cm-line span:not(.cm-formatting-header) {
+    &.cm-header-1::before { content: 'H1'; }
+    &.cm-header-2::before { content: 'H2'; }
+    &.cm-header-3::before { content: 'H3'; }
+    &.cm-header-4::before { content: 'H4'; }
+    &.cm-header-5::before { content: 'H5'; }
+    &.cm-header-6::before { content: 'H6'; }
+}
+
+/* Geometric list bullets */
+body.lucky-beautify {
+    --list-marker-color: var(--text-faint);
+}
+
+/* Level 1: filled circle */
+body.lucky-beautify :is(.markdown-rendered ul > li > .list-bullet, .markdown-source-view.mod-cm6 .HyperMD-list-line-1 .list-bullet)::after {
+    content: '';
+    display: block;
+    width: 6px;
+    height: 6px;
+    background: var(--list-marker-color);
+    border-radius: 50%;
+    transform: translateY(-1px);
+}
+
+/* Level 2: filled square */
+body.lucky-beautify :is(.markdown-rendered ul > li > ul > li > .list-bullet, .markdown-source-view.mod-cm6 .HyperMD-list-line-2 .list-bullet)::after {
+    content: '';
+    display: block;
+    width: 5px;
+    height: 5px;
+    background: var(--list-marker-color);
+    border-radius: 1px;
+    transform: translateY(-1px);
+}
+
+/* Level 3: outlined circle */
+body.lucky-beautify :is(.markdown-rendered ul > li > ul > li > ul > li > .list-bullet, .markdown-source-view.mod-cm6 .HyperMD-list-line-3 .list-bullet)::after {
+    content: '';
+    display: block;
+    background: transparent;
+    border: 1.5px solid var(--list-marker-color);
+    width: 5px;
+    height: 5px;
+    border-radius: 50%;
+    box-sizing: border-box;
+    transform: translateY(-1px);
+}
+
+/* Inline code: bold + styled */
+body.lucky-beautify :not(pre)>code:not([class*='language-']) {
+    font-weight: bold;
+}
+
+body.lucky-beautify .cm-s-obsidian span.cm-inline-code {
+    font-weight: bold;
+}
+
+body.lucky-beautify :not(pre)>code {
+    color: var(--code-normal);
+    background-color: var(--code-background);
+    padding: 0.1em 0.3em;
+    border-radius: 4px;
+    font-size: 0.9em;
+}
+
+/* Tag alignment fix */
+body.lucky-beautify :where(.markdown-preview-view, .markdown-rendered) .tag {
+    display: inline-flex;
+    align-items: center;
+    vertical-align: middle;
+    height: 1.5em;
+}
+
+/* Image polish */
+body.lucky-beautify :is(.markdown-source-view, .markdown-rendered) img:not(.emoji) {
+    border-radius: 8px;
+    box-shadow: light-dark(0 2px 8px rgba(0,0,0,0.08), 0 2px 8px rgba(0,0,0,0.3));
+    transition: box-shadow 0.2s ease;
+}
+
+body.lucky-beautify :is(.markdown-source-view, .markdown-rendered) img:not(.emoji):hover {
+    box-shadow: light-dark(0 4px 16px rgba(0,0,0,0.12), 0 4px 16px rgba(0,0,0,0.4));
+}
+
+/* Long document performance: lazy render off-screen content */
+body.lucky-beautify .markdown-reading-view .markdown-preview-sizer > div {
+    content-visibility: auto;
+    contain-intrinsic-size: auto 100px;
+}
+
+/* =============================================================================
+   § 9 · CJK Typography (toggle-gated)
+   ============================================================================= */
+
+/* Punctuation compression */
+body.lucky-beautify.feature-cjk-typography :is(.markdown-source-view, .markdown-rendered) {
+    text-spacing-trim: space-first;
+    font-feature-settings: "halt" 1;
+    hanging-punctuation: first allow-end;
+}
+
+/* First-line indent */
+body.lucky-beautify.feature-cjk-indent :is(.markdown-source-view, .markdown-rendered) p {
+    text-indent: 2em;
+}
+
+body.lucky-beautify.feature-cjk-indent :is(.markdown-source-view, .markdown-rendered) li p {
+    text-indent: 0;
+}
+
+body.lucky-beautify.feature-cjk-indent :is(.markdown-source-view, .markdown-rendered) blockquote p {
+    text-indent: 0;
+}
+
+/* =============================================================================
+   Lucky Toolkit — Plugin Features
+   ============================================================================= */
+
+/* ===== Feature 1: Hider ===== */
+
+/* Hide scrollbars */
+.lucky-hide-scroll ::-webkit-scrollbar {
+  display: none;
+}
+
+/* Hide properties/metadata in reading view */
+.lucky-hide-meta .markdown-reading-view .metadata-container {
+  display: none;
+}
+
+/* Hide vault profile/name */
+.lucky-hide-vault .workspace-sidedock-vault-profile,
+body.lucky-hide-vault:not(.is-mobile) .workspace-split.mod-left-split .workspace-sidedock-vault-profile {
+  display: none;
+}
+
+/* ===== Feature 3: Note Count ===== */
+
+.lucky-note-count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 18px;
+  height: 16px;
+  padding: 0 5px;
+  margin-left: 6px;
+  border-radius: 8px;
+  font-size: 10px;
+  font-weight: 500;
+  font-family: var(--font-monospace, monospace);
+  color: var(--text-faint);
+  background: var(--background-modifier-hover);
+  line-height: 1;
+  vertical-align: middle;
+}
+
+.lucky-note-count:empty {
+  display: none;
+}
+
+/* ===== Feature 4: Tag Wrangler Modal ===== */
+
+.lucky-tag-modal-msg {
+  color: var(--text-muted);
+  margin-bottom: 8px;
+}
+
+.lucky-tag-input {
+  padding: 6px 10px;
+  margin-top: 4px;
+}
+
+.lucky-tag-btn-row {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 16px;
+}
+
+/* ===== Feature 5: Calendar ===== */
+
+.lucky-cal-container {
+  padding: 6px 2px 4px;
+  font-family: var(--font-text, var(--font-interface));
+}
+
+/* --- Header --- */
+.lucky-cal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 4px 6px 8px;
+  border-bottom: 1px solid var(--background-modifier-border);
+  margin-bottom: 6px;
+}
+
+.lucky-cal-nav-group {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.lucky-cal-nav {
+  cursor: pointer;
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 6px;
+  user-select: none;
+  color: var(--text-muted);
+  font-size: 14px;
+  transition: background-color 0.12s ease, color 0.12s ease;
+}
+
+.lucky-cal-today-btn {
+  font-size: 11px;
+  font-weight: 600;
+  color: light-dark(#E8873A, #ED9A52);
+  height: 24px;
+  padding: 0 8px;
+  border-radius: 12px;
+  border: 1px solid light-dark(rgba(232,135,58,0.3), rgba(237,154,82,0.3));
+  white-space: nowrap;
+}
+
+.lucky-cal-today-btn:hover {
+  background: light-dark(rgba(232,135,58,0.1), rgba(237,154,82,0.15));
+  color: light-dark(#E8873A, #ED9A52);
+}
+
+.lucky-cal-today-btn.is-current-month {
+  opacity: 0.35;
+  pointer-events: none;
+}
+
+.lucky-cal-nav:hover {
+  background: var(--background-modifier-hover);
+  color: var(--text-normal);
+}
+
+.lucky-cal-title {
+  font-weight: 600;
+  font-size: 13px;
+  letter-spacing: 0.02em;
+  cursor: pointer;
+  user-select: none;
+  color: var(--text-normal);
+  transition: color 0.12s ease;
+}
+
+.lucky-cal-title:hover {
+  color: var(--interactive-accent);
+}
+
+/* --- Grid --- */
+.lucky-cal-grid {
+  display: grid;
+  grid-template-columns: 22px repeat(7, 1fr);
+  gap: 3px;
+  padding: 0 2px;
+}
+
+/* --- Weekday headers --- */
+.lucky-cal-weekday {
+  text-align: center;
+  font-size: 10px;
+  color: var(--text-faint);
+  padding: 2px 0 4px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.lucky-cal-wk-header {
+  font-size: 9px;
+  color: var(--text-faint);
+  opacity: 0.5;
+}
+
+.lucky-cal-weekend-header {
+  color: light-dark(#8E8E93, #636366);
+}
+
+/* --- Week number gutter --- */
+.lucky-cal-wk {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 9px;
+  font-family: var(--font-monospace, monospace);
+  color: var(--text-faint);
+  opacity: 0.4;
+  user-select: none;
+  border-right: 1px solid var(--background-modifier-border);
+  margin-right: 2px;
+}
+
+/* --- Day cells --- */
+.lucky-cal-day {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  aspect-ratio: 1;
+  border-radius: 50%;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 400;
+  color: var(--text-normal);
+  user-select: none;
+  transition: background-color 0.15s ease, transform 0.15s ease, box-shadow 0.15s ease;
+  position: relative;
+}
+
+.lucky-cal-day:hover:not(.lucky-cal-empty):not(.lucky-cal-future) {
+  background: var(--background-modifier-hover);
+  transform: scale(1.1);
+  z-index: 1;
+}
+
+.lucky-cal-empty {
+  cursor: default;
+}
+
+/* Weekend text — soft rose */
+.lucky-cal-weekend {
+  color: light-dark(#8E8E93, #8E8E93);
+}
+
+/* Adjacent month days */
+.lucky-cal-adjacent {
+  opacity: 0.25;
+  font-weight: 300;
+}
+
+.lucky-cal-adjacent:hover {
+  opacity: 0.5;
+}
+
+/* Future */
+.lucky-cal-future {
+  opacity: 0.22;
+}
+
+/* --- Today (warm orange circle) --- */
+.lucky-cal-today {
+  background: light-dark(#E8873A, #ED9A52);
+  color: #FFFFFF;
+  font-weight: 700;
+  border-radius: 50%;
+  opacity: 1;
+  box-shadow: 0 1px 3px light-dark(rgba(232, 135, 58, 0.3), rgba(237, 154, 82, 0.35));
+  transform: none;
+}
+
+.lucky-cal-today:hover {
+  background: light-dark(#D47830, #F0A868);
+  box-shadow: 0 2px 6px light-dark(rgba(232, 135, 58, 0.4), rgba(237, 154, 82, 0.45));
+}
+
+/* --- Heatmap (GitHub green) --- */
+.lucky-cal-has-note {
+  font-weight: 500;
+}
+
+.lucky-cal-day[data-heat="1"] {
+  background: light-dark(hsl(130, 40%, 90%), hsl(130, 25%, 18%));
+}
+
+.lucky-cal-day[data-heat="2"] {
+  background: light-dark(hsl(130, 45%, 80%), hsl(130, 30%, 25%));
+}
+
+.lucky-cal-day[data-heat="3"] {
+  background: light-dark(hsl(130, 50%, 65%), hsl(130, 38%, 35%));
+  color: light-dark(hsl(130, 50%, 25%), hsl(130, 30%, 80%));
+}
+
+.lucky-cal-day[data-heat="4"] {
+  background: light-dark(hsl(130, 55%, 45%), hsl(130, 42%, 42%));
+  color: light-dark(hsl(130, 60%, 98%), hsl(130, 30%, 90%));
+  font-weight: 600;
+}
+
+/* Today overrides heatmap */
+.lucky-cal-today[data-heat] {
+  background: light-dark(#E8873A, #ED9A52);
+  color: #FFFFFF;
+}
+
+/* Weekend + heatmap combo: keep green bg but rose text hint */
+.lucky-cal-weekend[data-heat="3"],
+.lucky-cal-weekend[data-heat="4"] {
+  color: light-dark(hsl(130, 50%, 25%), hsl(130, 30%, 80%));
+}
+
+/* --- Footer --- */
+.lucky-cal-footer {
+  display: flex;
+  justify-content: center;
+  gap: 8px;
+  padding: 8px 0 4px;
+  font-size: 10px;
+  color: light-dark(#8E8E93, #8E8E93);
+  border-top: 1px solid var(--background-modifier-border);
+  margin-top: 6px;
+  letter-spacing: 0.02em;
+}
+
+.lucky-cal-footer span + span::before {
+  content: '·';
+  margin-right: 6px;
+}
+
+/* ===== Feature 7: Reading Time ===== */
+
+.lucky-reading-time {
+  font-size: 11px;
+  color: var(--text-faint);
+  padding: 0 8px;
+}
+
+/* ===== Feature 8: Focus Mode ===== */
+
+.lucky-focus-mode .markdown-source-view .cm-line {
+  opacity: 0.25;
+  transition: opacity 0.2s ease;
+}
+
+.lucky-focus-mode .markdown-source-view .cm-active {
+  opacity: 1;
+}
+
+/* Also handle reading view */
+.lucky-focus-mode .markdown-reading-view p,
+.lucky-focus-mode .markdown-reading-view li,
+.lucky-focus-mode .markdown-reading-view h1,
+.lucky-focus-mode .markdown-reading-view h2,
+.lucky-focus-mode .markdown-reading-view h3,
+.lucky-focus-mode .markdown-reading-view h4,
+.lucky-focus-mode .markdown-reading-view h5,
+.lucky-focus-mode .markdown-reading-view h6,
+.lucky-focus-mode .markdown-reading-view blockquote,
+.lucky-focus-mode .markdown-reading-view pre,
+.lucky-focus-mode .markdown-reading-view table {
+  opacity: 0.25;
+  transition: opacity 0.2s ease;
+}
+
+.lucky-focus-mode .markdown-reading-view :hover {
+  opacity: 1;
+}
+
+/* ===== Feature 11: File Explorer Beautify ===== */
+
+/* --- Indent guides --- */
+.nav-folder-children {
+  border-left: 1px solid light-dark(
+    hsl(0, 0%, 88%),
+    hsl(0, 0%, 22%)
+  );
+  margin-left: 10px;
+  padding-left: 6px;
+}
+
+/* --- Row styling --- */
+.nav-file-title,
+.nav-folder-title {
+  padding: 1px 6px;
+  border-radius: 4px;
+  transition: background-color 0.12s ease;
+}
+
+.nav-file-title:hover,
+.nav-folder-title:hover {
+  background: var(--background-modifier-hover);
+}
+
+/* --- Active file highlight --- */
+.nav-file-title.is-active {
+  background: color-mix(in srgb, var(--interactive-accent) 10%, transparent);
+  border-left: 2px solid var(--interactive-accent);
+  border-radius: 0 4px 4px 0;
+  padding-left: 4px;
+}
+
+/* --- Collapse arrow --- */
+.nav-folder-collapse-indicator {
+  opacity: 0.25;
+  transition: opacity 0.12s ease;
+}
+
+.nav-folder-title:hover .nav-folder-collapse-indicator {
+  opacity: 0.7;
+}
+
+.nav-folder.is-collapsed .nav-folder-collapse-indicator {
+  opacity: 0.4;
+}
+
+/* --- Folder name weight --- */
+.nav-folder-title-content {
+  font-weight: 500;
+}
+
+/* --- File name lighter --- */
+.nav-file-title-content {
+  font-weight: 400;
+  color: var(--text-muted);
+}
+
+.nav-file-title.is-active .nav-file-title-content {
+  color: var(--text-normal);
+  font-weight: 500;
+}
+
+/* --- Empty folder dim --- */
+.nav-folder:not(:has(.nav-file)) > .nav-folder-title .nav-folder-title-content {
+  opacity: 0.45;
+}
+
+/* --- Root level spacing --- */
+.workspace-leaf-content[data-type="file-explorer"] .nav-folder.mod-root > .nav-folder-children {
+  border-left: none;
+  margin-left: 0;
+  padding-left: 0;
+}
+
+/* --- Scrollbar hide in file explorer (consistent with hider) --- */
+.workspace-leaf-content[data-type="file-explorer"] ::-webkit-scrollbar {
+  width: 4px;
+}
+
+.workspace-leaf-content[data-type="file-explorer"] ::-webkit-scrollbar-thumb {
+  background: var(--background-modifier-border);
+  border-radius: 2px;
+}
+
+.workspace-leaf-content[data-type="file-explorer"] ::-webkit-scrollbar-thumb:hover {
+  background: var(--text-faint);
+}
+
+/* ===== Feature 12: File Explorer ===== */
+
+.lucky-fe-container {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  font-size: 13px;
+  font-family: var(--font-text, var(--font-interface));
+}
+
+/* Tree container */
+.lucky-fe-tree {
+  flex: 1;
+  overflow-y: auto;
+  padding: 4px 0;
+}
+
+.lucky-fe-tree::-webkit-scrollbar {
+  width: 4px;
+}
+
+.lucky-fe-tree::-webkit-scrollbar-thumb {
+  background: var(--background-modifier-border);
+  border-radius: 2px;
+}
+
+/* Folder */
+.lucky-fe-folder-title {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  cursor: pointer;
+  border-radius: 4px;
+  transition: background 0.12s ease;
+  user-select: none;
+}
+
+.lucky-fe-folder-title:hover {
+  background: var(--background-modifier-hover);
+}
+
+.lucky-fe-arrow {
+  display: inline-flex;
+  width: 14px;
+  font-size: 12px;
+  color: var(--text-faint);
+  transition: transform 0.12s ease;
+  flex-shrink: 0;
+}
+
+.lucky-fe-arrow.is-expanded {
+  transform: rotate(90deg);
+}
+
+/* Icons */
+.lucky-fe-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  color: var(--text-muted);
+}
+
+.lucky-fe-icon svg {
+  width: 14px;
+  height: 14px;
+}
+
+.lucky-fe-file-icon {
+  opacity: 0.4;
+}
+
+.lucky-fe-file-icon svg {
+  width: 12px;
+  height: 12px;
+}
+
+/* Root-level folders: larger, more breathing room */
+.lucky-fe-root-folder {
+  padding-top: 6px;
+  padding-bottom: 6px;
+  margin-top: 2px;
+  border-bottom: 1px solid transparent;
+}
+
+.lucky-fe-root-folder:hover {
+  border-bottom-color: var(--background-modifier-border);
+}
+
+.lucky-fe-root-folder .lucky-fe-folder-name {
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+}
+
+.lucky-fe-root-folder .lucky-fe-icon {
+  color: var(--interactive-accent);
+  opacity: 0.75;
+}
+
+.lucky-fe-root-folder:hover .lucky-fe-icon {
+  opacity: 1;
+}
+
+.lucky-fe-root-folder .lucky-fe-icon svg {
+  width: 16px;
+  height: 16px;
+}
+
+.lucky-fe-root-folder .lucky-fe-arrow {
+  font-size: 14px;
+}
+
+/* Sub-folder depth styling — progressively lighter */
+.lucky-fe-folder-title[data-depth="1"] .lucky-fe-folder-name {
+  color: var(--text-normal);
+}
+
+.lucky-fe-folder-title[data-depth="2"] .lucky-fe-folder-name {
+  color: var(--text-muted);
+  font-weight: 400;
+}
+
+.lucky-fe-folder-title[data-depth="3"] .lucky-fe-folder-name,
+.lucky-fe-folder-title[data-depth="4"] .lucky-fe-folder-name {
+  color: var(--text-faint);
+  font-weight: 400;
+  font-size: 12px;
+}
+
+.lucky-fe-folder-name {
+  font-weight: 500;
+  color: var(--text-normal);
+  flex: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.lucky-fe-count {
+  font-size: 10px;
+  font-family: var(--font-monospace, monospace);
+  color: var(--text-faint);
+  background: var(--background-modifier-hover);
+  padding: 0 5px;
+  border-radius: 8px;
+  min-width: 16px;
+  text-align: center;
+  line-height: 16px;
+  flex-shrink: 0;
+}
+
+/* Children indent guide — depth-progressive color */
+.lucky-fe-children {
+  border-left: 1px solid light-dark(hsl(0, 0%, 88%), hsl(0, 0%, 22%));
+  margin-left: 11px;
+  position: relative;
+}
+
+/* Depth 1 children: subtle accent tint on the guide */
+.lucky-fe-folder-title[data-depth="0"] + .lucky-fe-children {
+  border-left-color: color-mix(in srgb, var(--interactive-accent) 25%, transparent);
+}
+
+/* Depth 2+: progressively fainter */
+.lucky-fe-folder-title[data-depth="1"] + .lucky-fe-children {
+  border-left-color: light-dark(hsl(0, 0%, 90%), hsl(0, 0%, 20%));
+}
+
+.lucky-fe-folder-title[data-depth="2"] + .lucky-fe-children {
+  border-left-color: light-dark(hsl(0, 0%, 93%), hsl(0, 0%, 17%));
+}
+
+/* File */
+.lucky-fe-file {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  cursor: pointer;
+  border-radius: 4px;
+  transition: background-color 0.12s ease, border-color 0.12s ease;
+}
+
+.lucky-fe-file:hover {
+  background: var(--background-modifier-hover);
+}
+
+.lucky-fe-file.is-active {
+  background: color-mix(in srgb, var(--interactive-accent) 10%, transparent);
+  border-left: 2px solid var(--interactive-accent);
+  border-radius: 0 4px 4px 0;
+}
+
+.lucky-fe-file-name {
+  color: var(--text-muted);
+  font-weight: 400;
+  flex: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.lucky-fe-file.is-active .lucky-fe-file-name {
+  color: var(--text-normal);
+  font-weight: 500;
+}
+
+.lucky-fe-file-size {
+  font-size: 10px;
+  font-family: var(--font-monospace, monospace);
+  color: var(--text-faint);
+  flex-shrink: 0;
+  opacity: 0;
+  transition: opacity 0.12s ease;
+}
+
+.lucky-fe-file:hover .lucky-fe-file-size {
+  opacity: 1;
+}
+
+/* ===== Daily Note: 系统日志 Callout 压缩 ===== */
+
+/* Target the NOTE callout used for system logs in daily notes */
+.callout[data-callout="note"] {
+  padding: 4px 10px;
+  margin: 4px 0;
+  font-size: 12px;
+}
+
+.callout[data-callout="note"] .callout-title {
+  padding: 2px 0;
+  font-size: 11px;
+  gap: 4px;
+}
+
+.callout[data-callout="note"] .callout-title-inner {
+  font-weight: 500;
+}
+
+.callout[data-callout="note"] .callout-icon {
+  width: 14px;
+  height: 14px;
+}
+
+.callout[data-callout="note"] .callout-icon svg {
+  width: 14px;
+  height: 14px;
+}
+
+.callout[data-callout="note"] .callout-content {
+  padding: 0 0 2px;
+}
+
+.callout[data-callout="note"] .callout-content p {
+  margin: 0;
+  line-height: 1.4;
+}
+
+/* ===== Task / Checkbox Status Styling ===== */
+/* All checkbox styling consolidated here (moved from snippet) */
+/* Selectors use parent li[data-task] for robust matching */
+
+/* --- Base checkbox appearance --- */
+:is(.markdown-source-view, .markdown-rendered) input[type="checkbox"] {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 16px;
+    height: 16px;
+    border: 2px solid var(--text-faint);
+    border-radius: 4px;
+    background: transparent;
+    cursor: pointer;
+    vertical-align: middle;
+    margin-right: 6px;
+    transition: background-color 0.15s ease, border-color 0.15s ease;
+    position: relative;
+}
+
+/* --- Checkbox appearance by status (Reading + Source View) --- */
+
+/* [x] Completed — accent fill + ✓ */
+.markdown-rendered .task-list-item[data-task="x"] > input[type="checkbox"],
+.markdown-rendered .task-list-item[data-task="x"] > .task-list-item-checkbox,
+.markdown-source-view .HyperMD-task-line[data-task="x"] input[type="checkbox"] {
+    background-color: var(--interactive-accent);
+    border-color: var(--interactive-accent);
+}
+.markdown-rendered .task-list-item[data-task="x"] > input[type="checkbox"]::after,
+.markdown-rendered .task-list-item[data-task="x"] > .task-list-item-checkbox::after,
+.markdown-source-view .HyperMD-task-line[data-task="x"] input[type="checkbox"]::after {
+    content: '✗';
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    transform: translate(-50%, -50%);
+    font-size: 11px;
+    font-weight: 700;
+    color: white;
+    line-height: 1;
+}
+
+/* [>] Forwarded — blue fill + › */
+.markdown-rendered .task-list-item[data-task=">"] > input[type="checkbox"],
+.markdown-rendered .task-list-item[data-task=">"] > .task-list-item-checkbox,
+.markdown-source-view .HyperMD-task-line[data-task=">"] input[type="checkbox"] {
+    background-color: light-dark(hsl(210, 70%, 55%), hsl(210, 50%, 45%));
+    border-color: light-dark(hsl(210, 70%, 55%), hsl(210, 50%, 45%));
+}
+.markdown-rendered .task-list-item[data-task=">"] > input[type="checkbox"]::after,
+.markdown-rendered .task-list-item[data-task=">"] > .task-list-item-checkbox::after,
+.markdown-source-view .HyperMD-task-line[data-task=">"] input[type="checkbox"]::after {
+    content: '>';
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    transform: translate(-50%, -50%);
+    font-size: 12px;
+    font-weight: 800;
+    color: white;
+    line-height: 1;
+}
+
+/* [-] Cancelled — gray fill + — */
+.markdown-rendered .task-list-item[data-task="-"] > input[type="checkbox"],
+.markdown-rendered .task-list-item[data-task="-"] > .task-list-item-checkbox,
+.markdown-source-view .HyperMD-task-line[data-task="-"] input[type="checkbox"] {
+    background-color: var(--text-faint);
+    border-color: var(--text-faint);
+}
+.markdown-rendered .task-list-item[data-task="-"] > input[type="checkbox"]::after,
+.markdown-rendered .task-list-item[data-task="-"] > .task-list-item-checkbox::after,
+.markdown-source-view .HyperMD-task-line[data-task="-"] input[type="checkbox"]::after {
+    content: '-';
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    transform: translate(-50%, -50%);
+    font-size: 14px;
+    font-weight: 800;
+    color: white;
+    line-height: 1;
+}
+
+/* [/] In Progress — half-filled accent */
+.markdown-rendered .task-list-item[data-task="/"] > input[type="checkbox"],
+.markdown-rendered .task-list-item[data-task="/"] > .task-list-item-checkbox,
+.markdown-source-view .HyperMD-task-line[data-task="/"] input[type="checkbox"] {
+    background-color: color-mix(in srgb, var(--interactive-accent) 60%, transparent);
+    border-color: var(--interactive-accent);
+}
+.markdown-rendered .task-list-item[data-task="/"] > input[type="checkbox"]::after,
+.markdown-rendered .task-list-item[data-task="/"] > .task-list-item-checkbox::after,
+.markdown-source-view .HyperMD-task-line[data-task="/"] input[type="checkbox"]::after {
+    content: '/';
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    transform: translate(-50%, -50%);
+    font-size: 12px;
+    font-weight: 800;
+    color: white;
+    line-height: 1;
+}
+
+/* [!] Important — orange border + ! */
+.markdown-rendered .task-list-item[data-task="!"] > input[type="checkbox"],
+.markdown-rendered .task-list-item[data-task="!"] > .task-list-item-checkbox,
+.markdown-source-view .HyperMD-task-line[data-task="!"] input[type="checkbox"] {
+    border-color: light-dark(hsl(30, 90%, 50%), hsl(30, 70%, 50%));
+    border-width: 2.5px;
+    background: light-dark(hsl(30, 90%, 95%), hsl(30, 50%, 18%));
+}
+.markdown-rendered .task-list-item[data-task="!"] > input[type="checkbox"]::after,
+.markdown-rendered .task-list-item[data-task="!"] > .task-list-item-checkbox::after,
+.markdown-source-view .HyperMD-task-line[data-task="!"] input[type="checkbox"]::after {
+    content: '!';
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    transform: translate(-50%, -50%);
+    font-size: 12px;
+    font-weight: 800;
+    color: light-dark(hsl(30, 90%, 45%), hsl(30, 70%, 55%));
+    line-height: 1;
+}
+
+/* --- Reading View: Text styling --- */
+/* Must beat snippet's .task-list-item.is-checked specificity (0,4,0) → add .is-checked = (0,5,0) */
+
+/* [>] text — subtle blue, explicitly NO strikethrough */
+.markdown-rendered .task-list-item[data-task=">"].is-checked .task-list-item-checkbox ~ * {
+    text-decoration: none;
+    color: light-dark(hsl(210, 50%, 55%), hsl(210, 40%, 60%));
+}
+
+/* [-] text — strikethrough + gray (same as snippet default, but explicit) */
+.markdown-rendered .task-list-item[data-task="-"].is-checked .task-list-item-checkbox ~ * {
+    text-decoration: line-through;
+    color: var(--text-faint);
+}
+
+/* [/] text — normal, explicitly NO strikethrough */
+.markdown-rendered .task-list-item[data-task="/"].is-checked .task-list-item-checkbox ~ * {
+    text-decoration: none;
+    color: var(--text-normal);
+}
+
+/* [!] text — bold emphasis, explicitly NO strikethrough */
+.markdown-rendered .task-list-item[data-task="!"].is-checked .task-list-item-checkbox ~ * {
+    text-decoration: none;
+    font-weight: 600;
+    color: var(--text-normal);
+}
+
+/* --- Source View --- */
+
+.markdown-source-view .HyperMD-task-line[data-task=">"] {
+    color: light-dark(hsl(210, 50%, 55%), hsl(210, 40%, 60%));
+}
+
+.markdown-source-view .HyperMD-task-line[data-task="-"] {
+    text-decoration: line-through;
+    color: var(--text-faint);
+}
+
+/* [/] in source: normal color, no special treatment needed */
+
+.markdown-source-view .HyperMD-task-line[data-task="x"] {
+    text-decoration: line-through;
+    color: var(--text-faint);
+}
+
+.markdown-source-view .HyperMD-task-line[data-task="!"] {
+    color: light-dark(hsl(30, 80%, 45%), hsl(30, 60%, 55%));
+    font-weight: 600;
+}
+
+/* ===== Mobile Adaptation ===== */
+
+/* --- Editor & reading view font +2 on mobile --- */
+body.is-mobile.lucky-beautify :is(.markdown-source-view .cm-scroller, .markdown-rendered) {
+    font-size: calc(var(--body-font-size-custom, 18px) + 2px) !important;
+}
+
+/* --- Calendar mobile — spacious & clear --- */
+body.is-mobile .lucky-cal-container {
+    padding: 10px 6px 8px;
+}
+
+body.is-mobile .lucky-cal-header {
+    padding: 8px 10px 12px;
+    margin-bottom: 8px;
+}
+
+body.is-mobile .lucky-cal-title {
+    font-size: 17px;
+}
+
+body.is-mobile .lucky-cal-nav {
+    width: 42px;
+    height: 42px;
+    font-size: 20px;
+    border-radius: 8px;
+}
+
+body.is-mobile .lucky-cal-today-btn {
+    height: 36px;
+    padding: 0 14px;
+    font-size: 14px;
+    border-radius: 18px;
+}
+
+body.is-mobile .lucky-cal-grid {
+    grid-template-columns: 20px repeat(7, 1fr);
+    gap: 4px;
+    padding: 0 4px;
+}
+
+body.is-mobile .lucky-cal-weekday {
+    font-size: 12px;
+    padding: 4px 0 6px;
+    font-weight: 700;
+}
+
+body.is-mobile .lucky-cal-day {
+    font-size: 15px;
+    min-height: 38px;
+    border-radius: 50%;
+}
+
+body.is-mobile .lucky-cal-today {
+    box-shadow: 0 2px 6px light-dark(rgba(232, 135, 58, 0.35), rgba(237, 154, 82, 0.4));
+}
+
+body.is-mobile .lucky-cal-wk {
+    font-size: 9px;
+}
+
+body.is-mobile .lucky-cal-footer {
+    font-size: 13px;
+    padding: 10px 0 6px;
+    margin-top: 6px;
+}
+
+/* --- File List mobile (Feature 12) — font +2 --- */
+body.is-mobile .lucky-fe-container {
+    font-size: 17px;
+}
+
+body.is-mobile .lucky-fe-folder-title {
+    padding: 6px 12px;
+}
+
+body.is-mobile .lucky-fe-root-folder .lucky-fe-folder-name {
+    font-size: 18px;
+}
+
+body.is-mobile .lucky-fe-folder-title[data-depth="3"] .lucky-fe-folder-name,
+body.is-mobile .lucky-fe-folder-title[data-depth="4"] .lucky-fe-folder-name {
+    font-size: 16px;
+}
+
+body.is-mobile .lucky-fe-file {
+    padding: 6px 12px;
+}
+
+body.is-mobile .lucky-fe-file-name {
+    font-size: 17px;
+}
+
+body.is-mobile .lucky-fe-count {
+    font-size: 14px;
+    min-width: 22px;
+    line-height: 22px;
+}
+
+/* Nav toolbar buttons larger on mobile */
+body.is-mobile .lucky-fe-container .nav-buttons-container {
+    gap: 6px;
+    padding: 8px 10px;
+}
+
+body.is-mobile .lucky-fe-container .nav-action-button {
+    width: 36px;
+    height: 36px;
+}
+
+body.is-mobile .lucky-fe-container .nav-action-button svg {
+    width: 20px;
+    height: 20px;
+}
+
+/* Show file size always on mobile (no hover on touch) */
+body.is-mobile .lucky-fe-file-size {
+    opacity: 0.6;
+}
+
+body.is-mobile .lucky-fe-icon svg {
+    width: 16px;
+    height: 16px;
+}
+
+body.is-mobile .lucky-fe-file-icon svg {
+    width: 14px;
+    height: 14px;
+}
+
+/* --- Native File Explorer mobile (Feature 11) --- */
+body.is-mobile .nav-file-title,
+body.is-mobile .nav-folder-title {
+    padding: 4px 8px;
+}
+
+body.is-mobile .nav-file-title-content,
+body.is-mobile .nav-folder-title-content {
+    font-size: 17px;
+}
+
+/* --- Hide line numbers on mobile --- */
+body.is-mobile .cm-gutters {
+    display: none !important;
+}
+
+/* --- Focus Mode: disable dim on mobile (no hover on touch) --- */
+body.is-mobile.lucky-focus-mode .markdown-source-view .cm-line,
+body.is-mobile.lucky-focus-mode .markdown-reading-view p,
+body.is-mobile.lucky-focus-mode .markdown-reading-view li,
+body.is-mobile.lucky-focus-mode .markdown-reading-view h1,
+body.is-mobile.lucky-focus-mode .markdown-reading-view h2,
+body.is-mobile.lucky-focus-mode .markdown-reading-view h3,
+body.is-mobile.lucky-focus-mode .markdown-reading-view h4,
+body.is-mobile.lucky-focus-mode .markdown-reading-view h5,
+body.is-mobile.lucky-focus-mode .markdown-reading-view h6,
+body.is-mobile.lucky-focus-mode .markdown-reading-view blockquote,
+body.is-mobile.lucky-focus-mode .markdown-reading-view pre,
+body.is-mobile.lucky-focus-mode .markdown-reading-view table {
+    opacity: 1 !important;
+}
+
+/* --- System log callout: larger on mobile --- */
+body.is-mobile .callout[data-callout="note"] {
+    font-size: 14px;
+    padding: 6px 12px;
+}
+
+body.is-mobile .callout[data-callout="note"] .callout-title {
+    font-size: 13px;
+}
+
+/* --- Note count badge: larger on mobile --- */
+body.is-mobile .lucky-note-count {
+    font-size: 12px;
+    min-width: 20px;
+    height: 18px;
+    padding: 0 6px;
+}

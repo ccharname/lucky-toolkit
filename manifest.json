@@ -1,0 +1,9 @@
+{
+  "id": "lucky-toolkit",
+  "name": "Lucky Toolkit",
+  "version": "4.0.0",
+  "minAppVersion": "1.5.8",
+  "description": "Consolidated toolkit: hider, tab manager, note count, tag wrangler, calendar view, auto link title, reading time, focus mode, recent files, orphan notes",
+  "author": "zheng",
+  "isDesktopOnly": false
+}

@@ -1,0 +1,15 @@
+{
+  "enableBeautify": true,
+  "hideScroll": true,
+  "hidePropertiesReading": true,
+  "hideVault": true,
+  "preventDuplicateTabs": true,
+  "maxTabs": 0,
+  "showNoteCount": true,
+  "enableTagWrangler": true,
+  "showCalendar": true,
+  "autoLinkTitle": true,
+  "showReadingTime": true,
+  "focusMode": false,
+  "showFileExplorer": true
+}
