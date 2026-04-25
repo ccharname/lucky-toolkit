@@ -1,6 +1,38 @@
 'use strict';
 
-const { Plugin, PluginSettingTab, Setting, debounce, Menu, Notice, TFolder, TFile, ItemView, Modal, SuggestModal, FuzzySuggestModal, setIcon } = require('obsidian');
+const { Plugin, PluginSettingTab, Setting, debounce, Menu, Notice, TFolder, TFile, ItemView, Modal, SuggestModal, FuzzySuggestModal, setIcon, requestUrl } = require('obsidian');
+const CJK_RE = /[\u4e00-\u9fff]/g;
+const EN_RE = /\S+/g;
+
+function tokenHasNonCjkChar(token) {
+  for (let i = 0; i < token.length; i++) {
+    const code = token.charCodeAt(i);
+    if (code < 0x4e00 || code > 0x9fff) {
+      return true;
+    }
+  }
+  return false;
+}
+
+function countMdInFolder(folder, cache) {
+  if (!folder || !folder.children) return 0;
+  const cacheKey = folder.path;
+  if (cache && cache.has(cacheKey)) return cache.get(cacheKey);
+
+  let count = 0;
+  for (const child of folder.children) {
+    if (child instanceof TFile && child.extension === 'md') {
+      count++;
+    } else if (child instanceof TFolder) {
+      count += countMdInFolder(child, cache);
+    }
+  }
+
+  if (cache) {
+    cache.set(cacheKey, count);
+  }
+  return count;
+}
 
 // ============================================================
 // Default Settings
@@ -40,6 +72,7 @@ class LuckyToolkit extends Plugin {
   async onload() {
     console.log('Loading Lucky Toolkit');
     await this.loadSettings();
+    this._noteCountCache = new Map();
 
     // --- Feature 1: Hider — apply CSS classes based on settings ---
     this.applyHiderClasses();
@@ -264,6 +297,7 @@ class LuckyToolkit extends Plugin {
 
     // Debounced refresh on vault changes
     const debouncedRefresh = debounce(() => {
+      this._noteCountCache.clear();
       this.updateAllNoteCounts();
     }, 1000, true);
 
@@ -276,16 +310,7 @@ class LuckyToolkit extends Plugin {
    * Count .md files recursively in a TFolder
    */
   countMdFiles(folder) {
-    let count = 0;
-    if (!folder || !folder.children) return count;
-    for (const child of folder.children) {
-      if (child instanceof TFile && child.extension === 'md') {
-        count++;
-      } else if (child instanceof TFolder) {
-        count += this.countMdFiles(child);
-      }
-    }
-    return count;
+    return countMdInFolder(folder, this._noteCountCache);
   }
 
   /**
@@ -310,7 +335,7 @@ class LuckyToolkit extends Plugin {
       // item.file is a TAbstractFile; only process folders
       if (!(item.file instanceof TFolder)) continue;
 
-      const count = this.countMdFiles(item.file);
+      const count = countMdInFolder(item.file, this._noteCountCache);
       const titleEl = item.selfEl;
       if (!titleEl) continue;
 
@@ -460,30 +485,33 @@ class LuckyToolkit extends Plugin {
     const files = this.app.vault.getMarkdownFiles();
 
     try {
-      for (const file of files) {
-        const content = await this.app.vault.read(file);
+      const oldTagEscaped = oldTag.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const inlineRegex = new RegExp(
+        '#' + oldTagEscaped + '(?=([\\s,;.!?\\)\\]}\'"\\n\\r]|$|/))',
+        'g'
+      );
+      const fmRegex = new RegExp(
+        '(^\\s*-\\s+)' + oldTagEscaped + '(\\s*$)',
+        'gm'
+      );
+      const contents = await Promise.all(files.map((file) => this.app.vault.read(file)));
+      const pendingWrites = [];
+
+      for (let i = 0; i < files.length; i++) {
+        const content = contents[i];
         let newContent = content;
 
-        // Replace inline tags: #oldTag (with word boundary awareness)
-        // Match #oldTag but not #oldTag-extended (unless followed by sub-tag /)
-        const oldTagEscaped = oldTag.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-        const inlineRegex = new RegExp(
-          '#' + oldTagEscaped + '(?=([\\s,;.!?\\)\\]}\'"\\n\\r]|$|/))',
-          'g'
-        );
         newContent = newContent.replace(inlineRegex, '#' + newTag);
-
-        // Replace in frontmatter tags array (YAML list items like "  - tagname")
-        const fmRegex = new RegExp(
-          '(^\\s*-\\s+)' + oldTagEscaped + '(\\s*$)',
-          'gm'
-        );
         newContent = newContent.replace(fmRegex, '$1' + newTag + '$2');
 
         if (newContent !== content) {
-          await this.app.vault.modify(file, newContent);
-          filesModified++;
+          pendingWrites.push({ file: files[i], content: newContent });
         }
+      }
+
+      for (const pending of pendingWrites) {
+        await this.app.vault.modify(pending.file, pending.content);
+        filesModified++;
       }
     } catch (e) {
       console.error('Lucky Toolkit: 标签替换失败', e);
@@ -547,39 +575,35 @@ class LuckyToolkit extends Plugin {
     const cursor = editor.getCursor();
     const placeholder = '[获取标题中…](' + text + ')';
     editor.replaceSelection(placeholder);
+    const from = cursor;
+    const to = { line: cursor.line, ch: cursor.ch + placeholder.length };
 
-    // Fetch title with 5s timeout
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 5000);
+    // Fetch title with 5s timeout, via Obsidian's requestUrl to bypass CORS
+    const fetchTitle = requestUrl({ url: text, method: 'GET', throw: false });
+    const timeout = new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 5000));
 
     try {
-      const response = await fetch(text, {
-        headers: { 'User-Agent': 'Mozilla/5.0' },
-        redirect: 'follow',
-        signal: controller.signal,
-      });
-      clearTimeout(timeout);
-      const html = await response.text();
-      const match = html.match(/<title[^>]*>([^<]+)<\/title>/i);
-      if (match && match[1]) {
-        const title = match[1].trim().replace(/[\[\]]/g, '');
-        const from = cursor;
-        const to = { line: cursor.line, ch: cursor.ch + placeholder.length };
+      const response = await Promise.race([fetchTitle, timeout]);
+      const html = response && typeof response.text === 'string' ? response.text : '';
+      const match = html.match(/<title[^>]*>([\s\S]*?)<\/title>/i);
+      if (match && match[1] && match[1].trim()) {
+        const title = this.decodeHtmlEntities(match[1]).replace(/\s+/g, ' ').trim().replace(/[\[\]]/g, '');
         editor.replaceRange('[' + title + '](' + text + ')', from, to);
       } else {
-        // No title found — just keep raw URL
-        const from = cursor;
-        const to = { line: cursor.line, ch: cursor.ch + placeholder.length };
         editor.replaceRange(text, from, to);
       }
     } catch (e) {
-      clearTimeout(timeout);
-      // Timeout or error — revert to raw URL
-      const from = cursor;
-      const to = { line: cursor.line, ch: cursor.ch + placeholder.length };
       editor.replaceRange(text, from, to);
-      console.log('Lucky Toolkit: 获取标题失败', text);
+      console.log('Lucky Toolkit: 获取标题失败', text, e);
     }
+  }
+
+  decodeHtmlEntities(s) {
+    const named = { amp: '&', lt: '<', gt: '>', quot: '"', apos: "'", nbsp: ' ' };
+    return s
+      .replace(/&#x([0-9a-f]+);/gi, (_, h) => String.fromCodePoint(parseInt(h, 16)))
+      .replace(/&#(\d+);/g, (_, d) => String.fromCodePoint(parseInt(d, 10)))
+      .replace(/&([a-z]+);/gi, (m, n) => named[n.toLowerCase()] || m);
   }
 
   // ============================================================
@@ -604,8 +628,22 @@ class LuckyToolkit extends Plugin {
     this._readingTimeDirty = false;
     this.app.vault.cachedRead(file).then((text) => {
       // Chinese: ~400 chars/min, English: ~200 words/min
-      const chineseChars = (text.match(/[\u4e00-\u9fff]/g) || []).length;
-      const englishWords = text.replace(/[\u4e00-\u9fff]/g, '').split(/\s+/).filter(w => w.length > 0).length;
+      let chineseChars = 0;
+      let englishWords = 0;
+
+      CJK_RE.lastIndex = 0;
+      while (CJK_RE.exec(text) !== null) {
+        chineseChars++;
+      }
+
+      EN_RE.lastIndex = 0;
+      let wordMatch;
+      while ((wordMatch = EN_RE.exec(text)) !== null) {
+        if (tokenHasNonCjkChar(wordMatch[0])) {
+          englishWords++;
+        }
+      }
+
       const minutes = Math.ceil(chineseChars / 400 + englishWords / 200);
       const display = minutes < 1 ? '< 1 min' : minutes + ' min';
       this.readingTimeTextEl.setText(display);
@@ -719,27 +757,28 @@ class LuckyCalendarView extends ItemView {
     const todayStr = today.format('YYYY-MM-DD');
     const month = this.currentMonth;
 
-    // === Header (Apple Calendar style: Title left, [Today] [‹] [›] right) ===
+    // === Header (iOS Calendar style: [‹] title(center, click→today) [›]) ===
     const header = container.createEl('div', { cls: 'lucky-cal-header' });
+    const prevBtn = header.createEl('span', { cls: 'lucky-cal-nav', text: '‹' });
     const titleEl = header.createEl('span', { cls: 'lucky-cal-title', text: month.format('YYYY年 M月') });
-    const rightNav = header.createEl('div', { cls: 'lucky-cal-nav-group' });
     const isCurrentMonth = month.isSame(today, 'month');
-    const todayBtn = rightNav.createEl('span', { cls: 'lucky-cal-nav lucky-cal-today-btn' + (isCurrentMonth ? ' is-current-month' : ''), text: '今日' });
-    todayBtn.addEventListener('click', () => { if (!isCurrentMonth) { this.currentMonth = window.moment(); this.render(); } });
-    const prevBtn = rightNav.createEl('span', { cls: 'lucky-cal-nav', text: '‹' });
-    const nextBtn = rightNav.createEl('span', { cls: 'lucky-cal-nav', text: '›' });
+    if (!isCurrentMonth) titleEl.addClass('lucky-cal-title-clickable');
+    titleEl.addEventListener('click', () => {
+      if (!isCurrentMonth) { this.currentMonth = window.moment(); this.render(); }
+    });
+    const nextBtn = header.createEl('span', { cls: 'lucky-cal-nav', text: '›' });
 
     prevBtn.addEventListener('click', () => { this.currentMonth = this.currentMonth.clone().subtract(1, 'month'); this.render(); });
     nextBtn.addEventListener('click', () => { this.currentMonth = this.currentMonth.clone().add(1, 'month'); this.render(); });
 
-    // === Grid with week number column: 8 columns (wk + Mon-Sun) ===
+    // === Grid: 8 columns (week# gutter + Mon-Sun) ===
     const grid = container.createEl('div', { cls: 'lucky-cal-grid' });
 
-    // Weekday headers
-    grid.createEl('div', { cls: 'lucky-cal-weekday lucky-cal-wk-header', text: 'W' });
+    // Week-number gutter header (empty spacer) + weekday headers
+    grid.createEl('div', { cls: 'lucky-cal-wk-header' });
     const weekdayNames = ['一', '二', '三', '四', '五', '六', '日'];
     for (let i = 0; i < weekdayNames.length; i++) {
-      const cls = 'lucky-cal-weekday' + (i >= 5 ? ' lucky-cal-weekend-header' : '');
+      const cls = 'lucky-cal-weekday' + (i >= 5 ? ' lucky-cal-weekday-weekend' : '');
       grid.createEl('div', { cls, text: weekdayNames[i] });
     }
 
@@ -757,28 +796,23 @@ class LuckyCalendarView extends ItemView {
     const totalWeeks = Math.ceil(totalCells / 7);
 
     for (let week = 0; week < totalWeeks; week++) {
-      // Week number — use Monday of this row
-      let weekRefDay;
-      if (week === 0) {
-        weekRefDay = startOfMonth.clone();
-      } else {
-        const d = Math.min(currentDay, daysInMonth);
-        weekRefDay = month.clone().date(d);
-      }
-      grid.createEl('div', { cls: 'lucky-cal-wk', text: String(weekRefDay.isoWeek()) });
+      // Week-number gutter cell — use Monday of this visible row for ISO week calc
+      const mondayOfRow = startOfMonth.clone().subtract(startDay - 1, 'days').add(week * 7, 'days');
+      grid.createEl('div', { cls: 'lucky-cal-wk', text: String(mondayOfRow.isoWeek()) });
 
       for (let dow = 1; dow <= 7; dow++) {
         if (week === 0 && dow < startDay) {
           // Previous month's trailing days
           const prevDay = prevMonthDays - (startDay - 1 - dow);
           const prevDateStr = prevMonth.format('YYYY-MM') + '-' + String(prevDay).padStart(2, '0');
-          const dayEl = grid.createEl('div', { cls: 'lucky-cal-day lucky-cal-adjacent', text: String(prevDay) });
+          const dayEl = grid.createEl('div', { cls: 'lucky-cal-day lucky-cal-adjacent' });
+          dayEl.createSpan({ cls: 'lucky-cal-day-num', text: String(prevDay) });
           dayEl.setAttribute('data-date', prevDateStr);
           if (dow >= 6) dayEl.addClass('lucky-cal-weekend');
           const prevHeat = this.getHeatLevel(prevDateStr);
           if (prevHeat > 0) {
-            dayEl.setAttribute('data-heat', String(prevHeat));
-            dayEl.addClass('lucky-cal-has-note');
+            const dots = dayEl.createDiv({ cls: 'lucky-cal-heat-dots', attr: { 'data-heat': String(prevHeat) } });
+            for (let i = 0; i < prevHeat; i++) dots.createDiv({ cls: 'lucky-cal-heat-dot' });
           }
           if (prevDateStr === this.selectedDate) dayEl.addClass('lucky-cal-selected');
         } else if (currentDay > daysInMonth) {
@@ -786,19 +820,21 @@ class LuckyCalendarView extends ItemView {
           const nextDay = currentDay - daysInMonth;
           const nextMonth = month.clone().add(1, 'month');
           const nextDateStr = nextMonth.format('YYYY-MM') + '-' + String(nextDay).padStart(2, '0');
-          const dayEl = grid.createEl('div', { cls: 'lucky-cal-day lucky-cal-adjacent', text: String(nextDay) });
+          const dayEl = grid.createEl('div', { cls: 'lucky-cal-day lucky-cal-adjacent' });
+          dayEl.createSpan({ cls: 'lucky-cal-day-num', text: String(nextDay) });
           dayEl.setAttribute('data-date', nextDateStr);
           if (dow >= 6) dayEl.addClass('lucky-cal-weekend');
           const nextHeat = this.getHeatLevel(nextDateStr);
           if (nextHeat > 0) {
-            dayEl.setAttribute('data-heat', String(nextHeat));
-            dayEl.addClass('lucky-cal-has-note');
+            const dots = dayEl.createDiv({ cls: 'lucky-cal-heat-dots', attr: { 'data-heat': String(nextHeat) } });
+            for (let i = 0; i < nextHeat; i++) dots.createDiv({ cls: 'lucky-cal-heat-dot' });
           }
           if (nextDateStr === this.selectedDate) dayEl.addClass('lucky-cal-selected');
           currentDay++;
         } else {
           const dateStr = month.format('YYYY-MM') + '-' + String(currentDay).padStart(2, '0');
-          const dayEl = grid.createEl('div', { cls: 'lucky-cal-day', text: String(currentDay) });
+          const dayEl = grid.createEl('div', { cls: 'lucky-cal-day' });
+          dayEl.createSpan({ cls: 'lucky-cal-day-num', text: String(currentDay) });
           dayEl.setAttribute('data-date', dateStr);
 
           if (dow >= 6) dayEl.addClass('lucky-cal-weekend');
@@ -810,8 +846,8 @@ class LuckyCalendarView extends ItemView {
 
           const heat = this.getHeatLevel(dateStr);
           if (heat > 0) {
-            dayEl.setAttribute('data-heat', String(heat));
-            dayEl.addClass('lucky-cal-has-note');
+            const dots = dayEl.createDiv({ cls: 'lucky-cal-heat-dots', attr: { 'data-heat': String(heat) } });
+            for (let i = 0; i < heat; i++) dots.createDiv({ cls: 'lucky-cal-heat-dot' });
           }
 
           if (dateStr > todayStr) {
@@ -872,7 +908,6 @@ class LuckyCalendarView extends ItemView {
         }
         file = await this.app.vault.create(filePath, content);
         this.dailyNotes[dateStr] = { file, size: content.length };
-        this.render();
       }
       await this.app.workspace.getLeaf(false).openFile(file);
     } catch (e) {
@@ -971,7 +1006,7 @@ class LuckyFileExplorer extends ItemView {
 
     // 4. Auto-reveal
     const revealBtn = navButtons.createEl('div', { cls: 'clickable-icon nav-action-button' + (this._autoReveal ? ' is-active' : ''), attr: { 'aria-label': '自动定位当前文件' } });
-    setIcon(revealBtn, 'lucide-gallery-vertical');
+    setIcon(revealBtn, 'lucide-locate');
     revealBtn.addEventListener('click', () => {
       this._autoReveal = !this._autoReveal;
       revealBtn.toggleClass('is-active', this._autoReveal);
@@ -1013,16 +1048,22 @@ class LuckyFileExplorer extends ItemView {
     this.renderTree();
 
     // Refresh on vault changes — invalidate cache, re-render tree only
-    const refresh = debounce(() => { this._mdCountCache = null; this.renderTree(); }, 500, true);
+    const refresh = debounce(() => {
+      this._mdCountCache.clear();
+      this.plugin._noteCountCache.clear();
+      this.renderTree();
+    }, 500, true);
     this.registerEvent(this.app.vault.on('create', refresh));
     this.registerEvent(this.app.vault.on('delete', refresh));
     this.registerEvent(this.app.vault.on('rename', refresh));
     this.registerEvent(this.app.workspace.on('file-open', () => {
-      this.highlightActiveFile();
-      if (this._autoReveal) {
-        const activeEl = this.containerEl.querySelector('.lucky-fe-file.is-active');
-        if (activeEl) activeEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
-      }
+      window.requestAnimationFrame(() => {
+        this.highlightActiveFile();
+        if (this._autoReveal) {
+          const activeEl = this.containerEl.querySelector('.lucky-fe-file.is-active');
+          if (activeEl) activeEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+      });
     }));
   }
 
@@ -1030,19 +1071,8 @@ class LuckyFileExplorer extends ItemView {
   getMdCount(folder) {
     if (!this._mdCountCache) {
       this._mdCountCache = new Map();
-      const buildCache = (f) => {
-        let count = 0;
-        if (!f.children) return 0;
-        for (const child of f.children) {
-          if (child instanceof TFile && child.extension === 'md') count++;
-          else if (child instanceof TFolder) count += buildCache(child);
-        }
-        this._mdCountCache.set(f.path, count);
-        return count;
-      };
-      buildCache(this.app.vault.getRoot());
     }
-    return this._mdCountCache.get(folder.path) || 0;
+    return countMdInFolder(folder, this._mdCountCache);
   }
 
   render() {
@@ -1054,6 +1084,7 @@ class LuckyFileExplorer extends ItemView {
     const treeEl = this._treeEl;
     treeEl.empty();
     const allFiles = this.app.vault.getMarkdownFiles();
+    const activePath = this.app.workspace.getActiveFile()?.path;
     const sm = this._sortMode;
     const sorted = allFiles.sort((a, b) => {
       if (sm === 'alphabeticalReverse') return b.basename.localeCompare(a.basename, 'zh-CN');
@@ -1065,11 +1096,11 @@ class LuckyFileExplorer extends ItemView {
     });
     for (const file of sorted) {
       if (file.path.startsWith('.')) continue;
+      const isActive = file.path === activePath;
       const fileEl = treeEl.createEl('div', {
-        cls: 'lucky-fe-file',
-        attr: { 'data-path': file.path },
+        cls: 'lucky-fe-file' + (isActive ? ' is-active' : ''),
+        attr: { 'data-depth': '0', 'data-path': file.path },
       });
-      fileEl.style.paddingLeft = '12px';
       const fileSizeKB = file.stat ? (file.stat.size / 1024).toFixed(1) + ' KB' : '';
       const fileMtime = file.stat ? new Date(file.stat.mtime).toLocaleDateString('zh-CN') : '';
       fileEl.setAttribute('title', file.path + (fileSizeKB ? '\n' + fileSizeKB + ' · ' + fileMtime : ''));
@@ -1094,6 +1125,7 @@ class LuckyFileExplorer extends ItemView {
 
   renderFolder(parentEl, folder, depth, isRoot) {
     if (!folder.children) return;
+    const activePath = this.app.workspace.getActiveFile()?.path;
 
     // Sort: folders first, then files; 6 native sort modes
     const sm = this._sortMode;
@@ -1121,7 +1153,6 @@ class LuckyFileExplorer extends ItemView {
         const folderEl = parentEl.createEl('div', { cls: 'lucky-fe-folder' });
         const titleCls = 'lucky-fe-folder-title' + (depth === 0 ? ' lucky-fe-root-folder' : '');
         const titleEl = folderEl.createEl('div', { cls: titleCls });
-        titleEl.style.paddingLeft = (depth * 16 + 4) + 'px';
         titleEl.setAttribute('data-depth', String(depth));
         // Cached count
         const mdCount = this.getMdCount(child);
@@ -1206,12 +1237,11 @@ class LuckyFileExplorer extends ItemView {
           menu.showAtPosition({ x: evt.pageX, y: evt.pageY });
         });
       } else if (child instanceof TFile && child.extension === 'md') {
-
+        const isActive = child.path === activePath;
         const fileEl = parentEl.createEl('div', {
-          cls: 'lucky-fe-file',
-          attr: { 'data-path': child.path },
+          cls: 'lucky-fe-file' + (isActive ? ' is-active' : ''),
+          attr: { 'data-depth': String(depth), 'data-path': child.path },
         });
-        fileEl.style.paddingLeft = (depth * 16 + 20) + 'px';
         // Tooltip: full path + size + modified time
         const fileSizeKB = child.stat ? (child.stat.size / 1024).toFixed(1) + ' KB' : '';
         const fileMtime = child.stat ? new Date(child.stat.mtime).toLocaleDateString('zh-CN') : '';
@@ -1262,36 +1292,28 @@ class LuckyFileExplorer extends ItemView {
       const container = this.containerEl.querySelector('.lucky-fe-tree');
       if (!container) return;
 
-      if (!activeFile) {
-        // Remove previous highlight when no active file
-        container.querySelectorAll('.lucky-fe-file.is-active').forEach((el) => el.removeClass('is-active'));
-        return;
-      }
+      if (!activeFile) return;
 
       const escaped = CSS.escape(activeFile.path);
       const existing = container.querySelector(`.lucky-fe-file[data-path="${escaped}"]`);
 
       if (existing) {
-        // Fast path: DOM already present — only toggle class
-        container.querySelectorAll('.lucky-fe-file.is-active').forEach((el) => el.removeClass('is-active'));
-        existing.addClass('is-active');
-        existing.scrollIntoView({ block: 'nearest' });
         return;
       }
 
-      // Slow path: ancestor folder not expanded — expand then re-render once
+      // Slow path: ancestor folder not expanded.
+      // Only expand+scroll when user explicitly enabled auto-reveal — otherwise
+      // keep the tree collapsed so that opening the sidebar shows the root layout.
+      if (!this._autoReveal) return;
+
       let parent = activeFile.parent;
       while (parent && parent.path !== '/') {
         this.expandedFolders.add(parent.path);
         parent = parent.parent;
       }
       this.renderTree();
-      // Re-query and mark after render (renderTree's own highlightActiveFile call
-      // returns early due to _highlighting guard, so we do it here)
       const newEl = container.querySelector(`.lucky-fe-file[data-path="${escaped}"]`);
       if (newEl) {
-        container.querySelectorAll('.lucky-fe-file.is-active').forEach((el) => el.removeClass('is-active'));
-        newEl.addClass('is-active');
         newEl.scrollIntoView({ block: 'nearest' });
       }
     } finally {

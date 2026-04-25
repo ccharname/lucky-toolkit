@@ -572,87 +572,83 @@ body.lucky-hide-vault:not(.is-mobile) .workspace-split.mod-left-split .workspace
   margin-top: 16px;
 }
 
-/* ===== Feature 5: Calendar ===== */
+/* ===== Feature 5: Calendar (iOS style + GitHub heat dot) ===== */
 
 .lucky-cal-container {
-  padding: 6px 2px 4px;
-  font-family: var(--font-text, var(--font-interface));
+  padding: 6px 4px 4px;
+  /* Force UI font across platforms — don't inherit --font-text which may be a serif */
+  font-family: var(--font-interface);
+  font-feature-settings: "tnum" 1;
+  --lucky-cal-weekend: light-dark(#E04F5F, #FF6B7A);
+  --lucky-cal-today-bg: light-dark(#FFCF40, #FFD75E);
+  --lucky-cal-selected-bg: light-dark(rgba(120, 140, 255, 0.32), rgba(140, 160, 255, 0.30));
+  --lucky-cal-cell-bg: light-dark(rgba(120, 120, 128, 0.08), rgba(200, 200, 210, 0.06));
+  --lucky-cal-cell-hover: light-dark(rgba(120, 120, 128, 0.16), rgba(200, 200, 210, 0.12));
+  --lucky-cal-nav-bg: light-dark(rgba(120, 120, 128, 0.12), rgba(200, 200, 210, 0.09));
+  --lucky-cal-nav-hover: light-dark(rgba(120, 120, 128, 0.22), rgba(200, 200, 210, 0.16));
+  --lucky-cal-heat-1: light-dark(#9be9a8, #0e4429);
+  --lucky-cal-heat-2: light-dark(#40c463, #006d32);
+  --lucky-cal-heat-3: light-dark(#30a14e, #26a641);
+  --lucky-cal-heat-4: light-dark(#216e39, #39d353);
 }
 
-/* --- Header --- */
+/* --- Header: [<] title(center, clickable→today) [>] --- */
 .lucky-cal-header {
   display: flex;
-  justify-content: space-between;
   align-items: center;
-  padding: 4px 6px 8px;
-  border-bottom: 1px solid var(--background-modifier-border);
+  gap: 8px;
+  padding: 4px 4px 10px;
   margin-bottom: 6px;
 }
 
-.lucky-cal-nav-group {
-  display: flex;
-  align-items: center;
-  gap: 2px;
-}
-
 .lucky-cal-nav {
+  flex: 0 0 32px;
+  box-sizing: border-box;
   cursor: pointer;
-  width: 28px;
-  height: 28px;
+  width: 32px;
+  min-width: 32px;
+  max-width: 32px;
+  height: 32px;
+  padding: 0;
   display: flex;
   align-items: center;
   justify-content: center;
-  border-radius: 6px;
+  border-radius: 8px;
   user-select: none;
-  color: var(--text-muted);
-  font-size: 14px;
-  transition: background-color 0.12s ease, color 0.12s ease;
-}
-
-.lucky-cal-today-btn {
-  font-size: 11px;
-  font-weight: 600;
-  color: var(--lucky-accent-warm);
-  height: 24px;
-  padding: 0 8px;
-  border-radius: 12px;
-  border: 1px solid var(--lucky-accent-warm-border);
-  white-space: nowrap;
-}
-
-.lucky-cal-today-btn:hover {
-  background: var(--lucky-accent-warm-bg);
-  color: var(--lucky-accent-warm);
-}
-
-.lucky-cal-today-btn.is-current-month {
-  opacity: 0.35;
-  pointer-events: none;
+  color: var(--text-normal);
+  font-size: 18px;
+  line-height: 1;
+  background: var(--lucky-cal-nav-bg);
+  transition: background-color 0.15s ease;
 }
 
 .lucky-cal-nav:hover {
-  background: var(--background-modifier-hover);
-  color: var(--text-normal);
+  background: var(--lucky-cal-nav-hover);
 }
 
 .lucky-cal-title {
+  flex: 1 1 auto;
+  text-align: center;
   font-weight: 600;
-  font-size: 13px;
-  letter-spacing: 0.02em;
-  cursor: pointer;
+  font-size: 15px;
+  letter-spacing: 0.01em;
   user-select: none;
   color: var(--text-normal);
   transition: color 0.12s ease;
 }
 
-.lucky-cal-title:hover {
+.lucky-cal-title-clickable {
+  cursor: pointer;
+}
+
+.lucky-cal-title-clickable:hover {
   color: var(--interactive-accent);
 }
 
-/* --- Grid --- */
+/* --- Grid: 8 columns (week# gutter + Mon-Sun) --- */
 .lucky-cal-grid {
   display: grid;
-  grid-template-columns: 22px repeat(7, 1fr);
+  grid-template-columns: 20px repeat(7, 1fr);
   gap: 3px;
   padding: 0 2px;
 }
@@ -660,183 +656,149 @@ body.lucky-hide-vault:not(.is-mobile) .workspace-split.mod-left-split .workspace
 /* --- Weekday headers --- */
 .lucky-cal-weekday {
   text-align: center;
-  font-size: 10px;
-  color: var(--text-faint);
-  padding: 2px 0 4px;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-}
-
-.lucky-cal-wk-header {
-  font-size: 9px;
-  color: var(--text-faint);
-  opacity: 0.5;
-}
-
-.lucky-cal-weekend-header {
+  font-size: 11px;
   color: var(--text-muted);
+  padding: 2px 0 6px;
+  font-weight: 600;
+  user-select: none;
 }
 
-/* --- Week number gutter --- */
+.lucky-cal-weekday-weekend {
+  color: var(--lucky-cal-weekend);
+}
+
+/* Empty header cell above the week-number gutter */
+.lucky-cal-wk-header {
+  /* intentionally empty — just a spacer aligned with other weekday headers */
+}
+
+/* --- Week number gutter cell: subtle gray digit, no border --- */
 .lucky-cal-wk {
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 9px;
-  font-family: var(--font-monospace, monospace);
+  font-size: 10px;
   color: var(--text-faint);
-  opacity: 0.4;
+  opacity: 0.55;
   user-select: none;
-  border-right: 1px solid var(--background-modifier-border);
-  margin-right: 2px;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0;
 }
 
-/* --- Day cells --- */
+/* --- Day cells: rounded squares ---
+   padding-bottom leaves room for the heat-dot row (absolute-positioned at bottom)
+   while the number stays visually balanced in the remaining space. */
 .lucky-cal-day {
+  position: relative;
   display: flex;
   align-items: center;
   justify-content: center;
   aspect-ratio: 1;
-  border-radius: 50%;
+  padding-bottom: 8px;
+  border-radius: 8px;
   cursor: pointer;
-  font-size: 13px;
-  font-weight: 400;
+  background: var(--lucky-cal-cell-bg);
   color: var(--text-normal);
   user-select: none;
-  transition: background-color 0.15s ease, transform 0.15s ease, box-shadow 0.15s ease;
-  position: relative;
+  transition: background-color 0.15s ease;
 }
 
-.lucky-cal-day:hover:not(.lucky-cal-empty):not(.lucky-cal-future) {
-  background: var(--background-modifier-hover);
-  transform: scale(1.1);
-  z-index: 1;
+.lucky-cal-day:hover:not(.lucky-cal-future) {
+  background: var(--lucky-cal-cell-hover);
 }
 
-.lucky-cal-empty {
-  cursor: default;
+.lucky-cal-day-num {
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
 }
 
-/* Weekend text — soft rose */
+/* Weekend numbers — red */
 .lucky-cal-weekend {
-  color: var(--text-muted);
+  color: var(--lucky-cal-weekend);
 }
 
-/* Adjacent month days */
+/* Adjacent month — faded */
 .lucky-cal-adjacent {
-  opacity: 0.35;
-  font-weight: 300;
+  opacity: 0.32;
 }
 
 .lucky-cal-adjacent:hover {
   opacity: 0.5;
 }
 
-/* Future */
+/* Future days — slightly dimmer */
 .lucky-cal-future {
-  opacity: 0.4;
+  opacity: 0.55;
 }
 
-/* --- Today: warm orange circle with pulse ring --- */
-.lucky-cal-today {
-  background: light-dark(#E8873A, #ED9A52);
-  color: #FFFFFF;
+/* --- Selected (non-today): soft blue-purple pill ---
+   Explicit color override stops .lucky-cal-weekend's red from bleeding through
+   on selected weekends. Today's color is restored by the next rule block. */
+.lucky-cal-selected {
+  background: var(--lucky-cal-selected-bg);
+  color: var(--text-normal);
+}
+
+.lucky-cal-selected:hover {
+  background: var(--lucky-cal-selected-bg);
+}
+
+.lucky-cal-adjacent.lucky-cal-selected {
+  opacity: 0.7;
+}
+
+/* --- Today: yellow pill (overrides selected) --- */
+.lucky-cal-today,
+.lucky-cal-today.lucky-cal-selected {
+  background: var(--lucky-cal-today-bg);
+  color: light-dark(#3a2a00, #2a1f00);
   font-weight: 700;
-  border-radius: 50%;
-  opacity: 1;
-  transform: none;
-  box-shadow:
-    0 1px 3px light-dark(rgba(232, 135, 58, 0.3), rgba(237, 154, 82, 0.35)),
-    0 0 0 0 light-dark(rgba(232, 135, 58, 0.35), rgba(237, 154, 82, 0.4));
-  animation: lucky-cal-today-pulse 2s ease-in-out infinite;
+}
+
+.lucky-cal-today .lucky-cal-day-num {
+  font-weight: 700;
 }
 
 .lucky-cal-today:hover {
-  background: light-dark(#D47830, #F0A868);
-  animation-play-state: paused;
-  box-shadow:
-    0 2px 6px light-dark(rgba(232, 135, 58, 0.4), rgba(237, 154, 82, 0.45)),
-    0 0 0 6px light-dark(rgba(232, 135, 58, 0.18), rgba(237, 154, 82, 0.22));
+  background: light-dark(#FFC020, #FFCA40);
 }
 
-@keyframes lucky-cal-today-pulse {
-  0%, 100% {
-    box-shadow:
-      0 1px 3px light-dark(rgba(232, 135, 58, 0.3), rgba(237, 154, 82, 0.35)),
-      0 0 0 0 light-dark(rgba(232, 135, 58, 0.35), rgba(237, 154, 82, 0.4));
-  }
-  50% {
-    box-shadow:
-      0 1px 4px light-dark(rgba(232, 135, 58, 0.4), rgba(237, 154, 82, 0.45)),
-      0 0 0 8px light-dark(rgba(232, 135, 58, 0.0), rgba(237, 154, 82, 0.0));
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .lucky-cal-today { animation: none; }
-}
-
-/* --- Heatmap (GitHub green) --- */
-.lucky-cal-has-note {
-  font-weight: 500;
-}
-
-.lucky-cal-day[data-heat="1"] {
-  background: light-dark(hsl(130, 40%, 90%), hsl(130, 25%, 18%));
-}
-
-.lucky-cal-day[data-heat="2"] {
-  background: light-dark(hsl(130, 45%, 80%), hsl(130, 30%, 25%));
-}
-
-.lucky-cal-day[data-heat="3"] {
-  background: light-dark(hsl(130, 50%, 65%), hsl(130, 38%, 35%));
-  color: light-dark(hsl(130, 50%, 25%), hsl(130, 30%, 80%));
-}
-
-.lucky-cal-day[data-heat="4"] {
-  background: light-dark(hsl(130, 55%, 45%), hsl(130, 42%, 42%));
-  color: light-dark(hsl(130, 60%, 98%), hsl(130, 30%, 90%));
-  font-weight: 600;
-}
-
-/* Today overrides heatmap */
-.lucky-cal-today[data-heat] {
-  background: light-dark(#E8873A, #ED9A52);
-  color: #FFFFFF;
-}
-
-/* Weekend + heatmap combo: keep green bg but rose text hint */
-.lucky-cal-weekend[data-heat="3"],
-.lucky-cal-weekend[data-heat="4"] {
-  color: light-dark(hsl(130, 50%, 25%), hsl(130, 30%, 80%));
-}
-
-/* --- Selected day (user click): blue accent ring via ::after ---
-   Use pseudo-element so it doesn't conflict with today's pulse animation */
-.lucky-cal-selected {
-  z-index: 1;
-}
-
-.lucky-cal-selected::after {
-  content: "";
+/* --- GitHub green heat dots (bottom-center, 1-4 dots = 4 heat levels) ---
+   iOS-native "event dot row" pattern: count encodes intensity, all dots same color. */
+.lucky-cal-heat-dots {
   position: absolute;
-  inset: -2px;
-  border: 2px solid var(--interactive-accent);
-  border-radius: 50%;
+  bottom: 4px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  gap: 2px;
   pointer-events: none;
 }
 
-/* When selected overlaps today: inset the ring so it sits inside the orange circle */
-.lucky-cal-today.lucky-cal-selected::after {
-  inset: 2px;
-  border-color: light-dark(rgba(255, 255, 255, 0.85), rgba(255, 255, 255, 0.9));
+.lucky-cal-heat-dot {
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  /* Fallback background — ensures dots stay visible even if a future code path
+     forgets to set [data-heat] on the parent. Middle-tier green picks up the
+     "moderate activity" semantic without looking out of place. */
+  background: var(--lucky-cal-heat-2);
 }
 
-/* Selected on adjacent month: stronger opacity so the ring remains visible */
-.lucky-cal-adjacent.lucky-cal-selected {
-  opacity: 0.7;
+/* 4 levels — reuse --lucky-cal-heat-1..4 defined on .lucky-cal-container.
+   Light mode: level 1 lightest, level 4 darkest.
+   Dark mode:  level 1 darkest, level 4 brightest.
+   Same signal encoded twice: dot count × dot color depth. */
+.lucky-cal-heat-dots[data-heat="1"] .lucky-cal-heat-dot { background: var(--lucky-cal-heat-1); }
+.lucky-cal-heat-dots[data-heat="2"] .lucky-cal-heat-dot { background: var(--lucky-cal-heat-2); }
+.lucky-cal-heat-dots[data-heat="3"] .lucky-cal-heat-dot { background: var(--lucky-cal-heat-3); }
+.lucky-cal-heat-dots[data-heat="4"] .lucky-cal-heat-dot { background: var(--lucky-cal-heat-4); }
+
+/* On yellow today pill, force the deepest green for contrast regardless of heat */
+.lucky-cal-today .lucky-cal-heat-dot {
+  background: var(--lucky-cal-heat-4);
 }
 
 /* --- Footer --- */
@@ -844,11 +806,10 @@ body.lucky-hide-vault:not(.is-mobile) .workspace-split.mod-left-split .workspace
   display: flex;
   justify-content: center;
   gap: 8px;
-  padding: 8px 0 4px;
+  padding: 10px 0 4px;
   font-size: 10px;
   color: var(--text-faint);
-  border-top: 1px solid var(--background-modifier-border);
-  margin-top: 6px;
+  margin-top: 8px;
   letter-spacing: 0.02em;
 }
 
@@ -1002,15 +963,49 @@ body.lucky-hide-vault:not(.is-mobile) .workspace-split.mod-left-split .workspace
   display: flex;
   flex-direction: column;
   height: 100%;
+  padding: 0;
   font-size: 13px;
-  font-family: var(--font-text, var(--font-interface));
+  font-family: var(--font-interface);
+}
+
+/* --- Top toolbar: flush to the top, centered row of action buttons --- */
+.lucky-fe-container > .nav-header {
+  padding: 2px 8px 4px;
+  margin: 0;
+  border-bottom: 1px solid var(--background-modifier-border);
+  min-height: 0;
+}
+
+.lucky-fe-container > .nav-header > .nav-buttons-container {
+  padding: 0;
+  margin: 0;
+  gap: 4px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.lucky-fe-container .nav-action-button {
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  margin: 0;
+}
+
+.lucky-fe-container .nav-action-button.is-active {
+  background: var(--background-modifier-hover);
+  color: var(--interactive-accent);
 }
 
 /* Tree container */
 .lucky-fe-tree {
   flex: 1;
   overflow-y: auto;
-  padding: 4px 0;
+  padding: 4px 0 8px;
 }
 
 .lucky-fe-tree::-webkit-scrollbar {
@@ -1022,12 +1017,12 @@ body.lucky-hide-vault:not(.is-mobile) .workspace-split.mod-left-split .workspace
   border-radius: 2px;
 }
 
-/* Folder */
+/* Folder title — constant left padding; depth cascade comes from .lucky-fe-children margin */
 .lucky-fe-folder-title {
   display: flex;
   align-items: center;
-  gap: 4px;
-  padding: 2px 8px;
+  gap: 6px;
+  padding: 3px 8px 3px 8px;
   cursor: pointer;
   border-radius: 4px;
   transition: background 0.12s ease;
@@ -1040,6 +1035,8 @@ body.lucky-hide-vault:not(.is-mobile) .workspace-split.mod-left-split .workspace
 
 .lucky-fe-arrow {
   display: inline-flex;
+  align-items: center;
+  justify-content: center;
   width: 14px;
   font-size: 12px;
   color: var(--text-faint);
@@ -1066,24 +1063,19 @@ body.lucky-hide-vault:not(.is-mobile) .workspace-split.mod-left-split .workspace
 }
 
 .lucky-fe-file-icon {
-  opacity: 0.4;
+  opacity: 0.45;
 }
 
 .lucky-fe-file-icon svg {
-  width: 12px;
-  height: 12px;
+  width: 13px;
+  height: 13px;
 }
 
-/* Root-level folders: larger, more breathing room */
+/* Root-level folders: larger, more breathing room, hairline divider between */
 .lucky-fe-root-folder {
-  padding-top: 6px;
-  padding-bottom: 6px;
-  margin-top: 2px;
-  border-bottom: 1px solid transparent;
-}
-
-.lucky-fe-root-folder:hover {
-  border-bottom-color: var(--background-modifier-border);
+  padding-top: 5px;
+  padding-bottom: 5px;
+  margin-top: 1px;
 }
 
 .lucky-fe-root-folder .lucky-fe-folder-name {
@@ -1094,7 +1086,7 @@ body.lucky-hide-vault:not(.is-mobile) .workspace-split.mod-left-split .workspace
 
 .lucky-fe-root-folder .lucky-fe-icon {
   color: var(--interactive-accent);
-  opacity: 0.75;
+  opacity: 0.8;
 }
 
 .lucky-fe-root-folder:hover .lucky-fe-icon {
@@ -1107,28 +1099,13 @@ body.lucky-hide-vault:not(.is-mobile) .workspace-split.mod-left-split .workspace
 }
 
 .lucky-fe-root-folder .lucky-fe-arrow {
-  font-size: 14px;
+  font-size: 13px;
 }
 
-/* Sub-folder depth styling — progressively lighter */
-.lucky-fe-folder-title[data-depth="1"] .lucky-fe-folder-name {
-  color: var(--text-normal);
-}
-
-.lucky-fe-folder-title[data-depth="2"] .lucky-fe-folder-name {
-  color: var(--text-muted);
-  font-weight: 400;
-}
-
-.lucky-fe-folder-title[data-depth="3"] .lucky-fe-folder-name,
-.lucky-fe-folder-title[data-depth="4"] .lucky-fe-folder-name {
-  color: var(--text-faint);
-  font-weight: 400;
-  font-size: 12px;
-}
-
+/* Sub-folder depth cascade — only weight + color, keep same font-size for visual harmony */
 .lucky-fe-folder-name {
   font-weight: 500;
+  font-size: 13px;
   color: var(--text-normal);
   flex: 1;
   white-space: nowrap;
@@ -1136,32 +1113,49 @@ body.lucky-hide-vault:not(.is-mobile) .workspace-split.mod-left-split .workspace
   text-overflow: ellipsis;
 }
 
+.lucky-fe-folder-title[data-depth="1"] .lucky-fe-folder-name {
+  font-weight: 500;
+  color: var(--text-normal);
+}
+
+.lucky-fe-folder-title[data-depth="2"] .lucky-fe-folder-name {
+  font-weight: 400;
+  color: var(--text-muted);
+}
+
+.lucky-fe-folder-title[data-depth="3"] .lucky-fe-folder-name,
+.lucky-fe-folder-title[data-depth="4"] .lucky-fe-folder-name,
+.lucky-fe-folder-title[data-depth="5"] .lucky-fe-folder-name {
+  font-weight: 400;
+  color: var(--text-faint);
+}
+
 .lucky-fe-count {
   font-size: 10px;
   font-family: var(--font-monospace, monospace);
+  font-variant-numeric: tabular-nums;
   color: var(--text-faint);
   background: var(--background-modifier-hover);
-  padding: 0 5px;
+  padding: 0 6px;
   border-radius: 8px;
-  min-width: 16px;
-  text-align: center;
+  min-width: 18px;
+  height: 16px;
   line-height: 16px;
+  text-align: center;
   flex-shrink: 0;
 }
 
-/* Children indent guide — depth-progressive color */
+/* Children indent guide — one consistent step per depth */
 .lucky-fe-children {
   border-left: 1px solid light-dark(hsl(0, 0%, 88%), hsl(0, 0%, 22%));
-  margin-left: 11px;
+  margin-left: 14px;
   position: relative;
 }
 
-/* Depth 1 children: subtle accent tint on the guide */
 .lucky-fe-folder-title[data-depth="0"] + .lucky-fe-children {
   border-left-color: color-mix(in srgb, var(--interactive-accent) 25%, transparent);
 }
 
-/* Depth 2+: progressively fainter */
 .lucky-fe-folder-title[data-depth="1"] + .lucky-fe-children {
   border-left-color: light-dark(hsl(0, 0%, 90%), hsl(0, 0%, 20%));
 }
@@ -1170,12 +1164,13 @@ body.lucky-hide-vault:not(.is-mobile) .workspace-split.mod-left-split .workspace
   border-left-color: light-dark(hsl(0, 0%, 93%), hsl(0, 0%, 17%));
 }
 
-/* File */
+/* File row — same padding as folder title, so file-icon sits where folder arrow sits.
+   Files and sibling sub-folders have their names start at the same x. */
 .lucky-fe-file {
   display: flex;
   align-items: center;
-  gap: 4px;
-  padding: 2px 8px;
+  gap: 6px;
+  padding: 3px 8px;
   cursor: pointer;
   border-radius: 4px;
   transition: background-color 0.12s ease, border-color 0.12s ease;
@@ -1194,6 +1189,7 @@ body.lucky-hide-vault:not(.is-mobile) .workspace-split.mod-left-split .workspace
 .lucky-fe-file-name {
   color: var(--text-muted);
   font-weight: 400;
+  font-size: 13px;
   flex: 1;
   white-space: nowrap;
   overflow: hidden;
@@ -1208,6 +1204,7 @@ body.lucky-hide-vault:not(.is-mobile) .workspace-split.mod-left-split .workspace
 .lucky-fe-file-size {
   font-size: 10px;
   font-family: var(--font-monospace, monospace);
+  font-variant-numeric: tabular-nums;
   color: var(--text-faint);
   flex-shrink: 0;
   opacity: 0;
@@ -1442,14 +1439,14 @@ body.is-mobile.lucky-beautify :is(.markdown-source-view .cm-scroller, .markdown-
     font-size: calc(var(--body-font-size-custom, 18px) + 2px) !important;
 }
 
-/* --- Calendar mobile — spacious & clear --- */
+/* --- Calendar mobile — bump roundness & font, inherit layout from desktop --- */
 body.is-mobile .lucky-cal-container {
-    padding: 10px 6px 8px;
+    padding: 8px 6px 6px;
 }
 
 body.is-mobile .lucky-cal-header {
-    padding: 8px 10px 12px;
-    margin-bottom: 8px;
+    padding: 6px 4px 10px;
+    margin-bottom: 6px;
 }
 
 body.is-mobile .lucky-cal-title {
@@ -1457,43 +1454,45 @@ body.is-mobile .lucky-cal-title {
 }
 
 body.is-mobile .lucky-cal-nav {
-    width: 42px;
-    height: 42px;
-    font-size: 20px;
-    border-radius: 8px;
-}
-
-body.is-mobile .lucky-cal-today-btn {
-    height: 36px;
-    padding: 0 14px;
-    font-size: 14px;
-    border-radius: 18px;
+    flex: 0 0 38px;
+    width: 38px;
+    min-width: 38px;
+    max-width: 38px;
+    height: 38px;
+    font-size: 22px;
+    border-radius: 10px;
 }
 
 body.is-mobile .lucky-cal-grid {
-    grid-template-columns: 20px repeat(7, 1fr);
-    gap: 4px;
-    padding: 0 4px;
+    gap: 5px;
 }
 
 body.is-mobile .lucky-cal-weekday {
-    font-size: 12px;
-    padding: 4px 0 6px;
+    font-size: 13px;
+    padding: 4px 0 8px;
     font-weight: 700;
 }
 
 body.is-mobile .lucky-cal-day {
-    font-size: 15px;
-    min-height: 38px;
-    border-radius: 50%;
+    border-radius: 14px;
 }
 
-body.is-mobile .lucky-cal-today {
-    box-shadow: 0 2px 6px light-dark(rgba(232, 135, 58, 0.35), rgba(237, 154, 82, 0.4));
+body.is-mobile .lucky-cal-day-num {
+    font-size: 16px;
+}
+
+body.is-mobile .lucky-cal-heat-dots {
+    bottom: 5px;
+    gap: 2.5px;
+}
+
+body.is-mobile .lucky-cal-heat-dot {
+    width: 5px;
+    height: 5px;
 }
 
 body.is-mobile .lucky-cal-wk {
-    font-size: 9px;
+    font-size: 11px;
 }
 
 body.is-mobile .lucky-cal-footer {
@@ -1502,67 +1501,89 @@ body.is-mobile .lucky-cal-footer {
     margin-top: 6px;
 }
 
-/* --- File List mobile (Feature 12) — font +2 --- */
+/* --- File List mobile (Feature 12) — +2 from desktop sizes, inherit shape --- */
 body.is-mobile .lucky-fe-container {
-    font-size: 17px;
-}
-
-body.is-mobile .lucky-fe-folder-title {
-    padding: 6px 12px;
-}
-
-body.is-mobile .lucky-fe-root-folder .lucky-fe-folder-name {
     font-size: 18px;
 }
 
-body.is-mobile .lucky-fe-folder-title[data-depth="3"] .lucky-fe-folder-name,
-body.is-mobile .lucky-fe-folder-title[data-depth="4"] .lucky-fe-folder-name {
-    font-size: 16px;
+body.is-mobile .lucky-fe-container > .nav-header {
+    padding: 6px 10px 8px;
 }
 
-body.is-mobile .lucky-fe-file {
-    padding: 6px 12px;
-}
-
-body.is-mobile .lucky-fe-file-name {
-    font-size: 17px;
-}
-
-body.is-mobile .lucky-fe-count {
-    font-size: 14px;
-    min-width: 22px;
-    line-height: 22px;
-}
-
-/* Nav toolbar buttons larger on mobile */
-body.is-mobile .lucky-fe-container .nav-buttons-container {
+body.is-mobile .lucky-fe-container > .nav-header > .nav-buttons-container {
     gap: 6px;
-    padding: 8px 10px;
 }
 
 body.is-mobile .lucky-fe-container .nav-action-button {
-    width: 36px;
-    height: 36px;
+    width: 38px;
+    height: 38px;
+    border-radius: 8px;
 }
 
 body.is-mobile .lucky-fe-container .nav-action-button svg {
-    width: 20px;
-    height: 20px;
+    width: 22px;
+    height: 22px;
 }
 
-/* Show file size always on mobile (no hover on touch) */
-body.is-mobile .lucky-fe-file-size {
-    opacity: 0.6;
+body.is-mobile .lucky-fe-folder-title {
+    padding: 7px 12px 7px 10px;
+    gap: 8px;
+}
+
+body.is-mobile .lucky-fe-folder-name {
+    font-size: 18px;
+}
+
+body.is-mobile .lucky-fe-root-folder .lucky-fe-folder-name {
+    font-size: 19px;
+}
+
+body.is-mobile .lucky-fe-file {
+    padding: 7px 12px 7px 10px;
+    gap: 8px;
+}
+
+body.is-mobile .lucky-fe-file-name {
+    font-size: 18px;
+}
+
+body.is-mobile .lucky-fe-count {
+    font-size: 13px;
+    min-width: 26px;
+    height: 22px;
+    line-height: 22px;
+    padding: 0 9px;
+    border-radius: 11px;
 }
 
 body.is-mobile .lucky-fe-icon svg {
+    width: 19px;
+    height: 19px;
+}
+
+body.is-mobile .lucky-fe-root-folder .lucky-fe-icon svg {
+    width: 21px;
+    height: 21px;
+}
+
+body.is-mobile .lucky-fe-file-icon svg {
     width: 16px;
     height: 16px;
 }
 
-body.is-mobile .lucky-fe-file-icon svg {
-    width: 14px;
-    height: 14px;
+body.is-mobile .lucky-fe-arrow {
+    width: 16px;
+    font-size: 14px;
+}
+
+body.is-mobile .lucky-fe-children {
+    margin-left: 18px;
+}
+
+/* Show file size always on mobile (no hover on touch) */
+body.is-mobile .lucky-fe-file-size {
+    opacity: 0.55;
+    font-size: 13px;
 }
 
 /* --- Native File Explorer mobile (Feature 11) --- */
@@ -1576,9 +1597,23 @@ body.is-mobile .nav-folder-title-content {
     font-size: 17px;
 }
 
-/* --- Hide line numbers on mobile --- */
-body.is-mobile .cm-gutters {
+/* --- Hide line numbers on mobile — aggressive zero-out to prevent FOUC flash ---
+   display: none alone causes a visible flicker because the gutter DOM is painted
+   with its default width in the first frame, then collapsed. Zeroing width/padding/
+   border in parallel ensures no horizontal space is ever reserved, even if the
+   display: none rule matches one tick late.
+   Selectors are scoped to line-number-specific classes only — do NOT use
+   `.cm-gutter` / `.cm-gutters` here, or future fold/lint/bookmark gutters would
+   also be killed. */
+body.is-mobile .cm-lineNumbers,
+body.is-mobile .cm-gutter.cm-lineNumbers,
+body.is-mobile .cm-gutterElement.cm-gutter-lineNumber {
     display: none !important;
+    width: 0 !important;
+    min-width: 0 !important;
+    max-width: 0 !important;
+    padding: 0 !important;
+    border: 0 !important;
 }
 
 /* --- Focus Mode: disable dim on mobile (no hover on touch) --- */
