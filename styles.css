@@ -303,9 +303,8 @@ body.lucky-beautify .cm-gutters {
    § 7 · Headings (baked-in)
    ============================================================================= */
 
-/* Heading base */
-body.lucky-beautify :is(.markdown-source-view, .markdown-rendered) :is(h1, h2, h3, h4, h5, h6),
-body.lucky-beautify :is(.cm-header-1, .cm-header-2, .cm-header-3, .cm-header-4, .cm-header-5, .cm-header-6) {
+/* Heading base — rendered mode (real block elements, unchanged) */
+body.lucky-beautify :is(.markdown-source-view, .markdown-rendered) :is(h1, h2, h3, h4, h5, h6) {
     line-height: var(--reading-line-height-heading, 1.2);
     margin-top: 1.2em;
     margin-bottom: 0.6em;
@@ -314,6 +313,22 @@ body.lucky-beautify :is(.cm-header-1, .cm-header-2, .cm-header-3, .cm-header-4, 
     color: var(--text-normal);
     border-radius: 6px;
     text-wrap: balance;
+    text-rendering: optimizeLegibility;
+}
+
+/* Live Preview: box on the line container so the whole row gets one background */
+body.lucky-beautify .cm-line:is(.HyperMD-header-1, .HyperMD-header-2, .HyperMD-header-3, .HyperMD-header-4, .HyperMD-header-5, .HyperMD-header-6) {
+    line-height: var(--reading-line-height-heading, 1.2);
+    margin-top: 1.2em;
+    margin-bottom: 0.6em;
+    padding: 0.2em 0.5em;
+    border-radius: 6px;
+}
+
+/* Live Preview inline spans: glyph properties only, no box */
+body.lucky-beautify :is(.cm-header-1, .cm-header-2, .cm-header-3, .cm-header-4, .cm-header-5, .cm-header-6) {
+    letter-spacing: -0.02em;
+    color: var(--text-normal);
     text-rendering: optimizeLegibility;
 }
 
@@ -336,29 +351,31 @@ body.lucky-beautify .cm-header-5 { font-size: var(--h5-size); }
 body.lucky-beautify :is(.markdown-source-view, .markdown-rendered) h6,
 body.lucky-beautify .cm-header-6 { font-size: var(--h6-size); }
 
-/* H1: accent tint bg + fit-content */
-body.lucky-beautify :is(.markdown-source-view, .markdown-rendered) h1,
-body.lucky-beautify .cm-header-1 {
+/* H1: accent tint bg */
+body.lucky-beautify :is(.markdown-source-view, .markdown-rendered) h1 {
     background: light-dark(hsla(var(--interactive-accent-hsl), 0.12), hsla(var(--interactive-accent-hsl), 0.08));
     width: fit-content;
 }
-
-/* H2: grey tint + left accent bar + fit-content */
-body.lucky-beautify :is(.markdown-source-view, .markdown-rendered) h2,
-body.lucky-beautify .cm-header-2 {
-    background: light-dark(rgba(100, 100, 100, 0.1), rgba(100, 100, 100, 0.06));
-    border-left: 4px solid var(--interactive-accent);
-    border-top-left-radius: 2px;
-    border-bottom-left-radius: 2px;
-    width: fit-content;
+body.lucky-beautify .cm-line.HyperMD-header-1 {
+    background: light-dark(hsla(var(--interactive-accent-hsl), 0.12), hsla(var(--interactive-accent-hsl), 0.08));
 }
 
-/* H3-H6: subtle grey + fit-content */
-body.lucky-beautify :is(.markdown-source-view, .markdown-rendered) :is(h3, h4, h5, h6),
-body.lucky-beautify :is(.cm-header-3, .cm-header-4, .cm-header-5, .cm-header-6) {
+/* H2-H6: shared subtle grey (color hierarchy collapsed to accent/grey two-tier;
+   level distinction carried by font-size and muted text color on H3+) */
+body.lucky-beautify :is(.markdown-source-view, .markdown-rendered) :is(h2, h3, h4, h5, h6) {
     background: light-dark(rgba(120, 120, 120, 0.05), rgba(120, 120, 120, 0.03));
-    color: var(--text-muted);
     width: fit-content;
+}
+body.lucky-beautify .cm-line:is(.HyperMD-header-2, .HyperMD-header-3, .HyperMD-header-4, .HyperMD-header-5, .HyperMD-header-6) {
+    background: light-dark(rgba(120, 120, 120, 0.05), rgba(120, 120, 120, 0.03));
+}
+
+/* H3+ text muted to keep level hierarchy without extra color block */
+body.lucky-beautify :is(.markdown-source-view, .markdown-rendered) :is(h3, h4, h5, h6) {
+    color: var(--text-muted);
+}
+body.lucky-beautify :is(.cm-header-3, .cm-header-4, .cm-header-5, .cm-header-6) {
+    color: var(--text-muted);
 }
 
 /* Active line highlight */

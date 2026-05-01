@@ -578,16 +578,37 @@ class LuckyToolkit extends Plugin {
     const from = cursor;
     const to = { line: cursor.line, ch: cursor.ch + placeholder.length };
 
-    // Fetch title with 5s timeout, via Obsidian's requestUrl to bypass CORS
-    const fetchTitle = requestUrl({ url: text, method: 'GET', throw: false });
+    // Fetch title with 5s timeout, via Obsidian's requestUrl to bypass CORS.
+    // Send a browser-like UA + explicit Accept-Encoding so sites like Bilibili
+    // serve the normal HTML page; decompress manually because requestUrl().text
+    // doesn't reliably auto-decompress gzip/brotli responses.
+    const fetchTitle = requestUrl({
+      url: text,
+      method: 'GET',
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36',
+        'Accept': 'text/html,application/xhtml+xml,*/*;q=0.8',
+        'Accept-Encoding': 'gzip, deflate',
+      },
+      throw: false,
+    });
     const timeout = new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 5000));
 
     try {
       const response = await Promise.race([fetchTitle, timeout]);
-      const html = response && typeof response.text === 'string' ? response.text : '';
-      const match = html.match(/<title[^>]*>([\s\S]*?)<\/title>/i);
-      if (match && match[1] && match[1].trim()) {
-        const title = this.decodeHtmlEntities(match[1]).replace(/\s+/g, ' ').trim().replace(/[\[\]]/g, '');
+      const html = this.decodeResponseBody(response);
+      let title = '';
+      const ogMatch = html.match(/<meta[^>]+(?:property|name)=["']og:title["'][^>]+content=["']([^"']+)["']/i)
+        || html.match(/<meta[^>]+content=["']([^"']+)["'][^>]+(?:property|name)=["']og:title["']/i);
+      if (ogMatch && ogMatch[1]) {
+        title = ogMatch[1];
+      } else {
+        const titleMatch = html.match(/<title[^>]*>([\s\S]*?)<\/title>/i);
+        if (titleMatch && titleMatch[1]) title = titleMatch[1];
+      }
+      if (title.trim()) {
+        title = this.decodeHtmlEntities(title).replace(/\s+/g, ' ').trim().replace(/[\[\]]/g, '');
+        title = this.stripSiteSuffix(title, text);
         editor.replaceRange('[' + title + '](' + text + ')', from, to);
       } else {
         editor.replaceRange(text, from, to);
@@ -596,6 +617,56 @@ class LuckyToolkit extends Plugin {
       editor.replaceRange(text, from, to);
       console.log('Lucky Toolkit: 获取标题失败', text, e);
     }
+  }
+
+  stripSiteSuffix(title, url) {
+    // Strip trailing "_站名" / " - 站名" / " | 站名" patterns. Site list keyed
+    // by hostname so we only trim suffixes the site actually uses.
+    let host = '';
+    try { host = new URL(url).hostname.toLowerCase(); } catch (_) { return title; }
+    const rules = [
+      { match: /(^|\.)bilibili\.com$/, suffixes: ['_哔哩哔哩_bilibili', '_哔哩哔哩bilibili', '_哔哩哔哩'] },
+      { match: /(^|\.)youtube\.com$/, suffixes: ['- YouTube'] },
+      { match: /(^|\.)zhihu\.com$/, suffixes: ['- 知乎'] },
+      { match: /(^|\.)douban\.com$/, suffixes: ['(豆瓣)'] },
+      { match: /(^|\.)weixin\.qq\.com$/, suffixes: [] },
+      { match: /(^|\.)github\.com$/, suffixes: [] },
+    ];
+    const seps = /[\s\-—–|｜·_]+$/;
+    for (const r of rules) {
+      if (!r.match.test(host)) continue;
+      for (const suf of r.suffixes) {
+        if (title.endsWith(suf)) {
+          title = title.slice(0, -suf.length).replace(seps, '').trim();
+          break;
+        }
+      }
+    }
+    return title;
+  }
+
+  decodeResponseBody(response) {
+    if (!response) return '';
+    const headers = response.headers || {};
+    const enc = String(headers['content-encoding'] || headers['Content-Encoding'] || '').toLowerCase();
+    const ab = response.arrayBuffer;
+    if (ab) {
+      try {
+        const zlib = require('zlib');
+        const buf = Buffer.from(ab);
+        const isGzipMagic = buf.length >= 2 && buf[0] === 0x1f && buf[1] === 0x8b;
+        if (enc.includes('br')) return zlib.brotliDecompressSync(buf).toString('utf-8');
+        if (enc.includes('gzip') || isGzipMagic) return zlib.gunzipSync(buf).toString('utf-8');
+        if (enc.includes('deflate')) {
+          try { return zlib.inflateSync(buf).toString('utf-8'); }
+          catch (_) { return zlib.inflateRawSync(buf).toString('utf-8'); }
+        }
+        return buf.toString('utf-8');
+      } catch (_) {
+        // fall through to .text
+      }
+    }
+    return typeof response.text === 'string' ? response.text : '';
   }
 
   decodeHtmlEntities(s) {
