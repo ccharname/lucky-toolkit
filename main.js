@@ -1195,18 +1195,17 @@ class LuckyFileExplorer extends ItemView {
         // Tooltip: path + count
         titleEl.setAttribute('title', child.path + ' · ' + mdCount + ' 篇笔记');
 
-        // Arrow
+        // Arrow — lucide chevron, rotates 90° when expanded (CSS)
         const arrow = titleEl.createEl('span', {
           cls: 'lucky-fe-arrow' + (isExpanded ? ' is-expanded' : ''),
-          text: '›'
         });
+        setIcon(arrow, 'chevron-right');
 
-        // Icon (for known folders)
+        // Icon — mapped icon for known root folders, generic folder otherwise
         const iconName = this.folderIcons[child.name];
-        if (iconName) {
-          const iconEl = titleEl.createEl('span', { cls: 'lucky-fe-icon' });
-          setIcon(iconEl, iconName);
-        }
+        const isGenericIcon = !iconName;
+        const iconEl = titleEl.createEl('span', { cls: 'lucky-fe-icon' });
+        setIcon(iconEl, iconName || (isExpanded ? 'folder-open' : 'folder'));
 
         // Folder name
         titleEl.createEl('span', { cls: 'lucky-fe-folder-name', text: child.name });
@@ -1232,6 +1231,7 @@ class LuckyFileExplorer extends ItemView {
             this.expandedFolders.delete(folderPath);
             childrenEl.style.display = 'none';
             arrow.removeClass('is-expanded');
+            if (isGenericIcon) setIcon(iconEl, 'folder');
           } else {
             this.expandedFolders.add(folderPath);
             if (!childrenRendered) {
@@ -1240,6 +1240,7 @@ class LuckyFileExplorer extends ItemView {
             }
             childrenEl.style.display = '';
             arrow.addClass('is-expanded');
+            if (isGenericIcon) setIcon(iconEl, 'folder-open');
           }
         });
 

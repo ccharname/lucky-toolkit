@@ -308,6 +308,9 @@ body.lucky-beautify .cm-gutters {
 /* Heading base — rendered mode (real block elements, unchanged) */
 body.lucky-beautify :is(.markdown-source-view, .markdown-rendered) :is(h1, h2, h3, h4, h5, h6) {
     font-family: var(--lucky-font-heading);
+    /* 得意黑 only ships one weight — re-enable synthetic bold (body sets font-synthesis:none) */
+    font-weight: 700;
+    font-synthesis: weight;
     line-height: var(--reading-line-height-heading, 1.2);
     margin-top: 1.2em;
     margin-bottom: 0.6em;
@@ -331,6 +334,8 @@ body.lucky-beautify .cm-line:is(.HyperMD-header-1, .HyperMD-header-2, .HyperMD-h
 /* Live Preview inline spans: glyph properties only, no box */
 body.lucky-beautify :is(.cm-header-1, .cm-header-2, .cm-header-3, .cm-header-4, .cm-header-5, .cm-header-6) {
     font-family: var(--lucky-font-heading);
+    font-weight: 700;
+    font-synthesis: weight;
     letter-spacing: -0.02em;
     color: var(--text-normal);
     text-rendering: optimizeLegibility;
@@ -1059,10 +1064,19 @@ body.lucky-hide-vault:not(.is-mobile) .workspace-split.mod-left-split .workspace
   align-items: center;
   justify-content: center;
   width: 14px;
-  font-size: 12px;
   color: var(--text-faint);
   transition: transform 0.12s ease;
   flex-shrink: 0;
+}
+
+.lucky-fe-arrow svg {
+  width: 12px;
+  height: 12px;
+  stroke-width: 2.5px;
+}
+
+.lucky-fe-folder-title:hover .lucky-fe-arrow {
+  color: var(--text-muted);
 }
 
 .lucky-fe-arrow.is-expanded {
@@ -1119,8 +1133,18 @@ body.lucky-hide-vault:not(.is-mobile) .workspace-split.mod-left-split .workspace
   height: 16px;
 }
 
-.lucky-fe-root-folder .lucky-fe-arrow {
-  font-size: 13px;
+.lucky-fe-root-folder .lucky-fe-arrow svg {
+  width: 13px;
+  height: 13px;
+}
+
+/* Non-root folders carry the generic folder/folder-open icon — keep it subtle */
+.lucky-fe-folder-title:not(.lucky-fe-root-folder) .lucky-fe-icon {
+  color: var(--text-faint);
+}
+
+.lucky-fe-folder-title:not(.lucky-fe-root-folder):hover .lucky-fe-icon {
+  color: var(--text-muted);
 }
 
 /* Sub-folder depth cascade — only weight + color, keep same font-size for visual harmony */
@@ -1597,7 +1621,11 @@ body.is-mobile .lucky-fe-file-icon svg {
 
 body.is-mobile .lucky-fe-arrow {
     width: 16px;
-    font-size: 14px;
+}
+
+body.is-mobile .lucky-fe-arrow svg {
+    width: 15px;
+    height: 15px;
 }
 
 body.is-mobile .lucky-fe-children {
