@@ -296,6 +296,10 @@ class LuckyToolkit extends Plugin {
   initNoteCount() {
     this.updateAllNoteCounts();
 
+    // Register vault listeners once — settings toggle may call this again
+    if (this._noteCountInited) return;
+    this._noteCountInited = true;
+
     // Debounced refresh on vault changes
     const debouncedRefresh = debounce(() => {
       this._noteCountCache.clear();
@@ -493,21 +497,39 @@ class LuckyToolkit extends Plugin {
 
     try {
       const oldTagEscaped = oldTag.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      // '$' is special in String.replace replacement strings ($1/$&/$$) — escape it
+      const newTagSafe = newTag.replace(/\$/g, '$$$$');
+      // Left boundary blocks false hits inside URLs/anchors (".../page#tag") and
+      // nested-tag tails; right boundary as before (incl. '/' so children rename too)
       const inlineRegex = new RegExp(
-        '#' + oldTagEscaped + '(?=([\\s,;.!?\\)\\]}\'"\\n\\r]|$|/))',
+        '(?<![\\w#/])#' + oldTagEscaped + '(?=([\\s,;.!?\\)\\]}\'"\\n\\r]|$|/))',
         'g'
       );
-      const fmRegex = new RegExp(
-        '(^\\s*-\\s+)' + oldTagEscaped + '(\\s*$)',
-        'gm'
-      );
+      // Frontmatter forms — applied ONLY inside the leading --- block, so a body
+      // list item that happens to equal the tag name is never touched
+      const fmListRegex = new RegExp('(^\\s*-\\s+["\']?)' + oldTagEscaped + '(["\']?\\s*$)', 'gm');
+      const fmScalarRegex = new RegExp('(^[Tt]ags?:\\s*["\']?)' + oldTagEscaped + '(["\']?\\s*$)', 'm');
+      const fmArrayLineRegex = /^([Tt]ags?:\s*\[)([^\]]*)(\].*)$/m;
+      const fmTokenRegex = new RegExp('^(["\']?)' + oldTagEscaped + '(["\']?)$');
 
       for (const file of files) {
         let changed = false;
         await this.app.vault.process(file, (content) => {
-          const newContent = content
-            .replace(inlineRegex, '#' + newTag)
-            .replace(fmRegex, '$1' + newTag + '$2');
+          let newContent = content;
+          const fmMatch = newContent.match(/^---\r?\n[\s\S]*?\r?\n---/);
+          if (fmMatch) {
+            const fm = fmMatch[0]
+              .replace(fmListRegex, '$1' + newTagSafe + '$2')
+              .replace(fmScalarRegex, '$1' + newTagSafe + '$2')
+              .replace(fmArrayLineRegex, (line, pre, body, post) =>
+                pre + body.split(',').map((tok) => {
+                  const m = tok.trim().match(fmTokenRegex);
+                  return m ? tok.replace(tok.trim(), () => m[1] + newTag + m[2]) : tok;
+                }).join(',') + post
+              );
+            newContent = fm + newContent.slice(fmMatch[0].length);
+          }
+          newContent = newContent.replace(inlineRegex, '#' + newTagSafe);
           changed = newContent !== content;
           return newContent;
         });
@@ -571,16 +593,26 @@ class LuckyToolkit extends Plugin {
     // Prevent default paste
     evt.preventDefault();
 
-    // Insert loading placeholder
-    const cursor = editor.getCursor();
+    // Insert loading placeholder. getCursor('from') = selection START — with an
+    // active selection, plain getCursor() returns the head (possibly the end),
+    // which is not where replaceSelection() inserts.
+    const cursor = editor.getCursor('from');
     const placeholder = '[获取标题中…](' + text + ')';
     editor.replaceSelection(placeholder);
     const from = cursor;
     const to = { line: cursor.line, ch: cursor.ch + placeholder.length };
-    // Guard: only replace if the placeholder is still intact (user may have
-    // typed elsewhere while the fetch was in flight, shifting positions)
-    const placeholderIntact = () => {
-      try { return editor.getRange(from, to) === placeholder; } catch (_) { return false; }
+    // Replace the placeholder wherever it now lives: fast path via saved coords,
+    // text-search fallback when user edits shifted them during the fetch.
+    const replacePlaceholder = (replacement) => {
+      try {
+        if (editor.getRange(from, to) === placeholder) {
+          editor.replaceRange(replacement, from, to);
+          return;
+        }
+      } catch (_) { /* stale coords — fall through */ }
+      const idx = editor.getValue().indexOf(placeholder);
+      if (idx === -1) return; // user removed the placeholder — nothing to do
+      editor.replaceRange(replacement, editor.offsetToPos(idx), editor.offsetToPos(idx + placeholder.length));
     };
 
     // Fetch title with 5s timeout, via Obsidian's requestUrl to bypass CORS.
@@ -611,16 +643,15 @@ class LuckyToolkit extends Plugin {
         const titleMatch = html.match(/<title[^>]*>([\s\S]*?)<\/title>/i);
         if (titleMatch && titleMatch[1]) title = titleMatch[1];
       }
-      if (!placeholderIntact()) return;
       if (title.trim()) {
         title = this.decodeHtmlEntities(title).replace(/\s+/g, ' ').trim().replace(/[\[\]]/g, '');
         title = this.stripSiteSuffix(title, text);
-        editor.replaceRange('[' + title + '](' + text + ')', from, to);
+        replacePlaceholder('[' + title + '](' + text + ')');
       } else {
-        editor.replaceRange(text, from, to);
+        replacePlaceholder(text);
       }
     } catch (e) {
-      if (placeholderIntact()) editor.replaceRange(text, from, to);
+      replacePlaceholder(text);
       console.log('Lucky Toolkit: 获取标题失败', text, e);
     }
   }
@@ -704,6 +735,8 @@ class LuckyToolkit extends Plugin {
     }
     this._readingTimeDirty = false;
     this.app.vault.cachedRead(file).then((text) => {
+      // Drop stale results: user may have switched files before this resolved
+      if (this.app.workspace.getActiveFile()?.path !== file.path) return;
       // Chinese: ~400 chars/min, English: ~200 words/min
       let chineseChars = 0;
       let englishWords = 0;
@@ -726,6 +759,7 @@ class LuckyToolkit extends Plugin {
       this.readingTimeTextEl.setText(display);
       this._readingTimeCache = { path: file.path };
     }).catch(() => {
+      if (this.app.workspace.getActiveFile()?.path !== file.path) return;
       this.readingTimeTextEl.setText('');
       this._readingTimeCache = null;
     });
@@ -966,6 +1000,9 @@ class LuckyCalendarView extends ItemView {
   }
 
   async openOrCreateNote(dateStr) {
+    // Guard against double-click racing two vault.create calls for the same date
+    if (this._creating && this._creating.has(dateStr)) return;
+    (this._creating || (this._creating = new Set())).add(dateStr);
     try {
       const m = window.moment(dateStr, 'YYYY-MM-DD');
       const filePath = '10-Journal/Daily/' + m.format('YYYY-MM') + '/' + dateStr + '.md';
@@ -991,6 +1028,8 @@ class LuckyCalendarView extends ItemView {
     } catch (e) {
       console.error('Lucky Toolkit: 打开/创建日记失败', e);
       new Notice('日记操作失败: ' + e.message);
+    } finally {
+      this._creating.delete(dateStr);
     }
   }
 }
@@ -1133,7 +1172,18 @@ class LuckyFileExplorer extends ItemView {
     }, 500, true);
     this.registerEvent(this.app.vault.on('create', refresh));
     this.registerEvent(this.app.vault.on('delete', refresh));
-    this.registerEvent(this.app.vault.on('rename', refresh));
+    this.registerEvent(this.app.vault.on('rename', (file, oldPath) => {
+      // Migrate expanded state (folder itself + expanded descendants) to new path
+      if (this.expandedFolders.delete(oldPath)) this.expandedFolders.add(file.path);
+      const prefix = oldPath + '/';
+      for (const p of [...this.expandedFolders]) {
+        if (p.startsWith(prefix)) {
+          this.expandedFolders.delete(p);
+          this.expandedFolders.add(file.path + '/' + p.slice(prefix.length));
+        }
+      }
+      refresh();
+    }));
     this.registerEvent(this.app.workspace.on('file-open', () => {
       window.requestAnimationFrame(() => {
         this.highlightActiveFile();
@@ -1328,13 +1378,15 @@ class LuckyFileExplorer extends ItemView {
       const container = this.containerEl.querySelector('.lucky-fe-tree');
       if (!container) return;
 
+      // Always clear the old highlight first — even when the new active file's
+      // row isn't rendered (collapsed folder), a stale highlight must not linger
+      container.querySelectorAll('.lucky-fe-file.is-active').forEach((el) => el.removeClass('is-active'));
       if (!activeFile) return;
 
       const escaped = CSS.escape(activeFile.path);
       const existing = container.querySelector(`.lucky-fe-file[data-path="${escaped}"]`);
 
       if (existing) {
-        container.querySelectorAll('.lucky-fe-file.is-active').forEach((el) => el.removeClass('is-active'));
         existing.addClass('is-active');
         return;
       }
@@ -1573,7 +1625,7 @@ class LuckyToolkitSettingTab extends PluginSettingTab {
         toggle.setValue(this.plugin.settings.showNoteCount).onChange(async (value) => {
           this.plugin.settings.showNoteCount = value;
           if (value) {
-            this.plugin.updateAllNoteCounts();
+            this.plugin.initNoteCount();
           } else {
             this.plugin.removeAllNoteCounts();
           }

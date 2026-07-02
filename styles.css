@@ -724,7 +724,9 @@ body.lucky-hide-vault:not(.is-mobile) .workspace-split.mod-left-split .workspace
   transition: background-color 0.15s ease;
 }
 
-.lucky-cal-day:hover:not(.lucky-cal-future) {
+/* Exclusions keep specificity below .lucky-cal-selected:hover / .lucky-cal-today:hover —
+   without them this rule (0,3,0) beats both (0,2,0) and greys out their hover states */
+.lucky-cal-day:hover:not(.lucky-cal-future):not(.lucky-cal-selected):not(.lucky-cal-today) {
   background: var(--lucky-cal-cell-hover);
 }
 
@@ -1581,9 +1583,25 @@ body.is-mobile .lucky-fe-root-folder .lucky-fe-folder-name {
     font-size: 19px;
 }
 
+/* Desktop depth rules carry [data-depth] (0,3,0) and beat the generic mobile
+   bump (0,2,1) — restate per-depth so deep folders aren't stuck at 12.5px.
+   17px keeps hierarchy: root 19 > depth1 18 > depth2+ 17 > file 16 */
+body.is-mobile .lucky-fe-folder-title[data-depth="2"] .lucky-fe-folder-name,
+body.is-mobile .lucky-fe-folder-title[data-depth="3"] .lucky-fe-folder-name,
+body.is-mobile .lucky-fe-folder-title[data-depth="4"] .lucky-fe-folder-name,
+body.is-mobile .lucky-fe-folder-title[data-depth="5"] .lucky-fe-folder-name {
+    font-size: 17px;
+}
+
 body.is-mobile .lucky-fe-file {
     padding: 7px 12px 7px 10px;
     gap: 8px;
+}
+
+/* Mobile padding shorthand above outranks the desktop is-active compensation —
+   restate it here (10px - 2px border) or selected rows shift 2px on touch */
+body.is-mobile .lucky-fe-file.is-active {
+    padding-left: 8px;
 }
 
 body.is-mobile .lucky-fe-file-name {
@@ -1642,6 +1660,12 @@ body.is-mobile .nav-folder-title {
 body.is-mobile .nav-file-title-content,
 body.is-mobile .nav-folder-title-content {
     font-size: 17px;
+}
+
+/* Same shorthand-vs-compensation clash as the custom file list: restate
+   is-active padding-left (8px - 2px border) for the native explorer on mobile */
+body.is-mobile .nav-file-title.is-active {
+    padding-left: 6px;
 }
 
 /* --- Hide line numbers on mobile — aggressive zero-out to prevent FOUC flash ---

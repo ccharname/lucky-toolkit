@@ -1,10 +1,10 @@
 # Lucky Toolkit
 
-> Consolidated toolkit: hider, tab manager, note count, tag wrangler, calendar view, auto link title, reading time, focus mode, recent files, orphan notes.
+> Consolidated toolkit: beautify, hider, tab manager, note count, tag wrangler, calendar view, auto link title, reading time, focus mode, file explorer, recent files, orphan notes.
 
 个人整合的 Obsidian 插件，把十多个常用小功能合并到单个插件里，便于一处管理。
 
-- **Version**: 4.0.0
+- **Version**: 4.0.4
 - **Min Obsidian Version**: 1.5.8
 - **Author**: zheng
 - **Platform**: Desktop & Mobile
@@ -16,7 +16,7 @@
 | 0 | **Beautify** | 排版与视觉增强 |
 | 1 | **Hider** | 隐藏滚动条 / Reading 视图 properties / vault 名称 |
 | 2 | **Tab Manager** | 防止重复标签页 + 标签页数量上限 |
-| 3 | **Note Count** | 状态栏显示笔记总数 |
+| 3 | **Note Count** | 文件管理器中按文件夹显示 .md 笔记数徽章 |
 | 4 | **Tag Wrangler** | 标签批量重命名/合并 |
 | 5 | **Calendar View** | 日历侧边栏 |
 | 6 | **Auto Link Title** | 粘贴 URL 自动抓取标题 |
