@@ -66,9 +66,9 @@ settings:
     -
         id: body-font-size-custom
         title: 正文字体大小 (Body Font Size)
-        description: 默认 19px
+        description: 默认 20px
         type: variable-number-slider
-        default: 19
+        default: 20
         min: 12
         max: 28
         step: 1
@@ -165,7 +165,7 @@ body.lucky-beautify :is(.markdown-source-view, .markdown-rendered) {
 
 /* Font size */
 body.lucky-beautify :is(.markdown-source-view .cm-scroller, .markdown-rendered) {
-    font-size: var(--body-font-size-custom, 19px);
+    font-size: var(--body-font-size-custom, 20px);
 }
 
 /* Line height & spacing */
@@ -308,9 +308,6 @@ body.lucky-beautify .cm-gutters {
 /* Heading base — rendered mode (real block elements, unchanged) */
 body.lucky-beautify :is(.markdown-source-view, .markdown-rendered) :is(h1, h2, h3, h4, h5, h6) {
     font-family: var(--lucky-font-heading);
-    /* 得意黑 only ships one weight — re-enable synthetic bold (body sets font-synthesis:none) */
-    font-weight: 700;
-    font-synthesis: weight;
     line-height: var(--reading-line-height-heading, 1.2);
     margin-top: 1.2em;
     margin-bottom: 0.6em;
@@ -334,8 +331,6 @@ body.lucky-beautify .cm-line:is(.HyperMD-header-1, .HyperMD-header-2, .HyperMD-h
 /* Live Preview inline spans: glyph properties only, no box */
 body.lucky-beautify :is(.cm-header-1, .cm-header-2, .cm-header-3, .cm-header-4, .cm-header-5, .cm-header-6) {
     font-family: var(--lucky-font-heading);
-    font-weight: 700;
-    font-synthesis: weight;
     letter-spacing: -0.02em;
     color: var(--text-normal);
     text-rendering: optimizeLegibility;
@@ -1484,7 +1479,7 @@ body.lucky-hide-vault:not(.is-mobile) .workspace-split.mod-left-split .workspace
 
 /* --- Editor & reading view font +2 on mobile --- */
 body.is-mobile.lucky-beautify :is(.markdown-source-view .cm-scroller, .markdown-rendered) {
-    font-size: calc(var(--body-font-size-custom, 18px) + 2px) !important;
+    font-size: calc(var(--body-font-size-custom, 19px) + 2px) !important;
 }
 
 /* --- Calendar mobile — bump roundness & font, inherit layout from desktop --- */
