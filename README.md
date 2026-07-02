@@ -4,7 +4,7 @@
 
 个人整合的 Obsidian 插件，把十多个常用小功能合并到单个插件里，便于一处管理。
 
-- **Version**: 4.0.4
+- **Version**: 4.0.5
 - **Min Obsidian Version**: 1.5.8
 - **Author**: zheng
 - **Platform**: Desktop & Mobile

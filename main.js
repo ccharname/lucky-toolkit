@@ -499,23 +499,32 @@ class LuckyToolkit extends Plugin {
       const oldTagEscaped = oldTag.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
       // '$' is special in String.replace replacement strings ($1/$&/$$) — escape it
       const newTagSafe = newTag.replace(/\$/g, '$$$$');
-      // Left boundary blocks false hits inside URLs/anchors (".../page#tag") and
-      // nested-tag tails; right boundary as before (incl. '/' so children rename too)
-      const inlineRegex = new RegExp(
-        '(?<![\\w#/])#' + oldTagEscaped + '(?=([\\s,;.!?\\)\\]}\'"\\n\\r]|$|/))',
-        'g'
-      );
-      // Frontmatter forms — applied ONLY inside the leading --- block, so a body
-      // list item that happens to equal the tag name is never touched
-      const fmListRegex = new RegExp('(^\\s*-\\s+["\']?)' + oldTagEscaped + '(["\']?\\s*$)', 'gm');
-      const fmScalarRegex = new RegExp('(^[Tt]ags?:\\s*["\']?)' + oldTagEscaped + '(["\']?\\s*$)', 'm');
+      // Frontmatter forms — applied ONLY inside the leading --- block. The
+      // (?:/…)? tails carry nested children: renaming `work` updates `work/sub`.
+      const fmListRegex = new RegExp('(^\\s*-\\s+["\']?)' + oldTagEscaped + '((?:/[^"\'\\r\\n]*)?["\']?\\s*$)', 'gm');
+      const fmScalarRegex = new RegExp('(^[Tt]ags?:\\s*["\']?)' + oldTagEscaped + '((?:/[^"\'\\r\\n]*)?["\']?\\s*$)', 'm');
       const fmArrayLineRegex = /^([Tt]ags?:\s*\[)([^\]]*)(\].*)$/m;
-      const fmTokenRegex = new RegExp('^(["\']?)' + oldTagEscaped + '(["\']?)$');
+      const fmTokenRegex = new RegExp('^(["\']?)' + oldTagEscaped + '((?:/.*)?)(["\']?)$');
+      const hashOld = '#' + oldTag;
 
       for (const file of files) {
+        // Inline tags come from the metadata cache's position table — the parser
+        // records only REAL tags, so code blocks and URL anchors are never touched
+        const cache = this.app.metadataCache.getFileCache(file);
+        const inlineTags = (cache && cache.tags) ? cache.tags : [];
         let changed = false;
         await this.app.vault.process(file, (content) => {
           let newContent = content;
+          // Inline first (offsets refer to pristine content), back-to-front so
+          // earlier offsets stay valid; slice-check guards against a stale cache
+          for (let i = inlineTags.length - 1; i >= 0; i--) {
+            const t = inlineTags[i];
+            if (t.tag !== hashOld && !t.tag.startsWith(hashOld + '/')) continue;
+            const start = t.position.start.offset;
+            const end = start + hashOld.length; // only the '#old' prefix — keeps '/child'
+            if (newContent.slice(start, end) !== hashOld) continue;
+            newContent = newContent.slice(0, start) + '#' + newTag + newContent.slice(end);
+          }
           const fmMatch = newContent.match(/^---\r?\n[\s\S]*?\r?\n---/);
           if (fmMatch) {
             const fm = fmMatch[0]
@@ -524,12 +533,11 @@ class LuckyToolkit extends Plugin {
               .replace(fmArrayLineRegex, (line, pre, body, post) =>
                 pre + body.split(',').map((tok) => {
                   const m = tok.trim().match(fmTokenRegex);
-                  return m ? tok.replace(tok.trim(), () => m[1] + newTag + m[2]) : tok;
+                  return m ? tok.replace(tok.trim(), () => m[1] + newTag + m[2] + m[3]) : tok;
                 }).join(',') + post
               );
             newContent = fm + newContent.slice(fmMatch[0].length);
           }
-          newContent = newContent.replace(inlineRegex, '#' + newTagSafe);
           changed = newContent !== content;
           return newContent;
         });
