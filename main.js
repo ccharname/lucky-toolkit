@@ -1,6 +1,6 @@
 'use strict';
 
-const { Plugin, PluginSettingTab, Setting, debounce, Menu, Notice, TFolder, TFile, ItemView, Modal, SuggestModal, FuzzySuggestModal, setIcon, requestUrl } = require('obsidian');
+const { Plugin, PluginSettingTab, Setting, debounce, Menu, Notice, TFolder, TFile, ItemView, Modal, SuggestModal, FuzzySuggestModal, setIcon, requestUrl, getAllTags } = require('obsidian');
 const CJK_RE = /[\u4e00-\u9fff]/g;
 const EN_RE = /\S+/g;
 
@@ -450,17 +450,22 @@ class LuckyToolkit extends Plugin {
     new Notice(`已将 #${sourceTag} 合并到 #${targetTag}，共 ${count} 个文件。`);
   }
 
-  async countTagOccurrences(tag) {
-    const tagEscaped = tag.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-    const regex = new RegExp('#' + tagEscaped + '(?=[\\s,;.!?\\)\\]}\'"\\n\\r]|$|/)', 'g');
-    const fmRegex = new RegExp('^\\s*-\\s+' + tagEscaped + '\\s*$', 'm');
-    let count = 0;
-    for (const file of this.app.vault.getMarkdownFiles()) {
-      const content = await this.app.vault.cachedRead(file);
-      if (regex.test(content) || fmRegex.test(content)) count++;
-      regex.lastIndex = 0;
-    }
-    return count;
+  /**
+   * Candidate files containing #tag (or a nested #tag/child), resolved from
+   * metadataCache — no file reads. Covers inline tags and all frontmatter forms.
+   */
+  getTagCandidateFiles(tag) {
+    const prefix = '#' + tag;
+    return this.app.vault.getMarkdownFiles().filter((file) => {
+      const cache = this.app.metadataCache.getFileCache(file);
+      if (!cache) return false;
+      const tags = getAllTags(cache);
+      return !!tags && tags.some((t) => t === prefix || t.startsWith(prefix + '/'));
+    });
+  }
+
+  countTagOccurrences(tag) {
+    return this.getTagCandidateFiles(tag).length;
   }
 
   /**
@@ -482,7 +487,8 @@ class LuckyToolkit extends Plugin {
     if (this._tagOpBusy) { new Notice('标签操作进行中，请稍候…'); return 0; }
     this._tagOpBusy = true;
     let filesModified = 0;
-    const files = this.app.vault.getMarkdownFiles();
+    // Only touch files whose metadata cache actually contains the tag
+    const files = this.getTagCandidateFiles(oldTag);
 
     try {
       const oldTagEscaped = oldTag.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -494,24 +500,17 @@ class LuckyToolkit extends Plugin {
         '(^\\s*-\\s+)' + oldTagEscaped + '(\\s*$)',
         'gm'
       );
-      const contents = await Promise.all(files.map((file) => this.app.vault.read(file)));
-      const pendingWrites = [];
 
-      for (let i = 0; i < files.length; i++) {
-        const content = contents[i];
-        let newContent = content;
-
-        newContent = newContent.replace(inlineRegex, '#' + newTag);
-        newContent = newContent.replace(fmRegex, '$1' + newTag + '$2');
-
-        if (newContent !== content) {
-          pendingWrites.push({ file: files[i], content: newContent });
-        }
-      }
-
-      for (const pending of pendingWrites) {
-        await this.app.vault.modify(pending.file, pending.content);
-        filesModified++;
+      for (const file of files) {
+        let changed = false;
+        await this.app.vault.process(file, (content) => {
+          const newContent = content
+            .replace(inlineRegex, '#' + newTag)
+            .replace(fmRegex, '$1' + newTag + '$2');
+          changed = newContent !== content;
+          return newContent;
+        });
+        if (changed) filesModified++;
       }
     } catch (e) {
       console.error('Lucky Toolkit: 标签替换失败', e);
@@ -577,6 +576,11 @@ class LuckyToolkit extends Plugin {
     editor.replaceSelection(placeholder);
     const from = cursor;
     const to = { line: cursor.line, ch: cursor.ch + placeholder.length };
+    // Guard: only replace if the placeholder is still intact (user may have
+    // typed elsewhere while the fetch was in flight, shifting positions)
+    const placeholderIntact = () => {
+      try { return editor.getRange(from, to) === placeholder; } catch (_) { return false; }
+    };
 
     // Fetch title with 5s timeout, via Obsidian's requestUrl to bypass CORS.
     // Send a browser-like UA + explicit Accept-Encoding so sites like Bilibili
@@ -606,6 +610,7 @@ class LuckyToolkit extends Plugin {
         const titleMatch = html.match(/<title[^>]*>([\s\S]*?)<\/title>/i);
         if (titleMatch && titleMatch[1]) title = titleMatch[1];
       }
+      if (!placeholderIntact()) return;
       if (title.trim()) {
         title = this.decodeHtmlEntities(title).replace(/\s+/g, ' ').trim().replace(/[\[\]]/g, '');
         title = this.stripSiteSuffix(title, text);
@@ -614,7 +619,7 @@ class LuckyToolkit extends Plugin {
         editor.replaceRange(text, from, to);
       }
     } catch (e) {
-      editor.replaceRange(text, from, to);
+      if (placeholderIntact()) editor.replaceRange(text, from, to);
       console.log('Lucky Toolkit: 获取标题失败', text, e);
     }
   }
@@ -782,6 +787,7 @@ class LuckyCalendarView extends ItemView {
     this.registerEvent(this.app.vault.on('create', refresh));
     this.registerEvent(this.app.vault.on('delete', refresh));
     this.registerEvent(this.app.vault.on('rename', refresh));
+    this.registerEvent(this.app.vault.on('modify', refresh)); // heat dots track file size
   }
 
   scanDailyNotes() {
@@ -1021,7 +1027,7 @@ class LuckyFileExplorer extends ItemView {
     this._sortMode = this._sortMode || 'alphabetical';
     this._autoReveal = this._autoReveal || false;
     this._allExpanded = false;
-    this._mdCountCache = null; // invalidated on vault change
+    this._mdCountCache = new Map(); // cleared on vault change
 
     const container = this.containerEl.children[1];
     container.addClass('lucky-fe-container');
@@ -1140,9 +1146,6 @@ class LuckyFileExplorer extends ItemView {
 
   // Cached md file count — built once per vault change, reused across render
   getMdCount(folder) {
-    if (!this._mdCountCache) {
-      this._mdCountCache = new Map();
-    }
     return countMdInFolder(folder, this._mdCountCache);
   }
 
@@ -1369,6 +1372,8 @@ class LuckyFileExplorer extends ItemView {
       const existing = container.querySelector(`.lucky-fe-file[data-path="${escaped}"]`);
 
       if (existing) {
+        container.querySelectorAll('.lucky-fe-file.is-active').forEach((el) => el.removeClass('is-active'));
+        existing.addClass('is-active');
         return;
       }
 
