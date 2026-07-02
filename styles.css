@@ -121,6 +121,8 @@ settings:
 body.lucky-beautify {
     --font-stack-code: 'JetBrainsMono Nerd Font Mono', 'Maple Mono', 'Menlo', ui-monospace, SFMono-Regular, monospace;
     --font-text: 'JetBrainsMono Nerd Font Mono', 'HarmonyOS Sans';
+    /* Headings: 得意黑 (Smiley Sans) — falls back to body stack where not installed (iOS) */
+    --lucky-font-heading: 'Smiley Sans Oblique', 'Smiley Sans', '得意黑', var(--font-text), sans-serif;
     font-synthesis: none;
 
     /* Major Third heading scale */
@@ -305,6 +307,7 @@ body.lucky-beautify .cm-gutters {
 
 /* Heading base — rendered mode (real block elements, unchanged) */
 body.lucky-beautify :is(.markdown-source-view, .markdown-rendered) :is(h1, h2, h3, h4, h5, h6) {
+    font-family: var(--lucky-font-heading);
     line-height: var(--reading-line-height-heading, 1.2);
     margin-top: 1.2em;
     margin-bottom: 0.6em;
@@ -327,6 +330,7 @@ body.lucky-beautify .cm-line:is(.HyperMD-header-1, .HyperMD-header-2, .HyperMD-h
 
 /* Live Preview inline spans: glyph properties only, no box */
 body.lucky-beautify :is(.cm-header-1, .cm-header-2, .cm-header-3, .cm-header-4, .cm-header-5, .cm-header-6) {
+    font-family: var(--lucky-font-heading);
     letter-spacing: -0.02em;
     color: var(--text-normal);
     text-rendering: optimizeLegibility;
@@ -1137,6 +1141,7 @@ body.lucky-hide-vault:not(.is-mobile) .workspace-split.mod-left-split .workspace
 
 .lucky-fe-folder-title[data-depth="2"] .lucky-fe-folder-name {
   font-weight: 400;
+  font-size: 12.5px;
   color: var(--text-muted);
 }
 
@@ -1144,6 +1149,7 @@ body.lucky-hide-vault:not(.is-mobile) .workspace-split.mod-left-split .workspace
 .lucky-fe-folder-title[data-depth="4"] .lucky-fe-folder-name,
 .lucky-fe-folder-title[data-depth="5"] .lucky-fe-folder-name {
   font-weight: 400;
+  font-size: 12.5px;
   color: var(--text-faint);
 }
 
@@ -1201,12 +1207,13 @@ body.lucky-hide-vault:not(.is-mobile) .workspace-split.mod-left-split .workspace
   background: color-mix(in srgb, var(--interactive-accent) 10%, transparent);
   border-left: 2px solid var(--interactive-accent);
   border-radius: 0 4px 4px 0;
+  padding-left: 6px; /* compensate 2px border so text doesn't shift */
 }
 
 .lucky-fe-file-name {
   color: var(--text-muted);
   font-weight: 400;
-  font-size: 13px;
+  font-size: 12px;
   flex: 1;
   white-space: nowrap;
   overflow: hidden;
@@ -1561,7 +1568,7 @@ body.is-mobile .lucky-fe-file {
 }
 
 body.is-mobile .lucky-fe-file-name {
-    font-size: 18px;
+    font-size: 16px;
 }
 
 body.is-mobile .lucky-fe-count {
@@ -1633,8 +1640,9 @@ body.is-mobile .cm-gutterElement.cm-gutter-lineNumber {
     border: 0 !important;
 }
 
-/* --- Focus Mode: disable dim on mobile (no hover on touch) --- */
-body.is-mobile.lucky-focus-mode .markdown-source-view .cm-line,
+/* --- Focus Mode on mobile: editor dim stays ON (focus follows the cursor line,
+   which works on touch); only the READING view dim is disabled, because its
+   un-dim relies on :hover which touch devices lack. --- */
 body.is-mobile.lucky-focus-mode .markdown-reading-view p,
 body.is-mobile.lucky-focus-mode .markdown-reading-view li,
 body.is-mobile.lucky-focus-mode .markdown-reading-view h1,

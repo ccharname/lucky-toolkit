@@ -3,6 +3,7 @@
 const { Plugin, PluginSettingTab, Setting, debounce, Menu, Notice, TFolder, TFile, ItemView, Modal, SuggestModal, FuzzySuggestModal, setIcon, requestUrl, getAllTags } = require('obsidian');
 const CJK_RE = /[\u4e00-\u9fff]/g;
 const EN_RE = /\S+/g;
+const ZH_COLLATOR = new Intl.Collator('zh-CN');
 
 function tokenHasNonCjkChar(token) {
   for (let i = 0; i < token.length; i++) {
@@ -1149,46 +1150,6 @@ class LuckyFileExplorer extends ItemView {
     return countMdInFolder(folder, this._mdCountCache);
   }
 
-  render() {
-    // Legacy compat — just re-render tree
-    this.renderTree();
-  }
-
-  renderFlat() {
-    const treeEl = this._treeEl;
-    treeEl.empty();
-    const allFiles = this.app.vault.getMarkdownFiles();
-    const activePath = this.app.workspace.getActiveFile()?.path;
-    const sm = this._sortMode;
-    const sorted = allFiles.sort((a, b) => {
-      if (sm === 'alphabeticalReverse') return b.basename.localeCompare(a.basename, 'zh-CN');
-      if (sm === 'byModifiedTime' && a.stat && b.stat) return b.stat.mtime - a.stat.mtime;
-      if (sm === 'byModifiedTimeReverse' && a.stat && b.stat) return a.stat.mtime - b.stat.mtime;
-      if (sm === 'byCreatedTime' && a.stat && b.stat) return b.stat.ctime - a.stat.ctime;
-      if (sm === 'byCreatedTimeReverse' && a.stat && b.stat) return a.stat.ctime - b.stat.ctime;
-      return a.basename.localeCompare(b.basename, 'zh-CN');
-    });
-    for (const file of sorted) {
-      if (file.path.startsWith('.')) continue;
-      const isActive = file.path === activePath;
-      const fileEl = treeEl.createEl('div', {
-        cls: 'lucky-fe-file' + (isActive ? ' is-active' : ''),
-        attr: { 'data-depth': '0', 'data-path': file.path },
-      });
-      const fileSizeKB = file.stat ? (file.stat.size / 1024).toFixed(1) + ' KB' : '';
-      const fileMtime = file.stat ? new Date(file.stat.mtime).toLocaleDateString('zh-CN') : '';
-      fileEl.setAttribute('title', file.path + (fileSizeKB ? '\n' + fileSizeKB + ' · ' + fileMtime : ''));
-      const fileIconEl = fileEl.createEl('span', { cls: 'lucky-fe-icon lucky-fe-file-icon' });
-      setIcon(fileIconEl, 'file-text');
-      fileEl.createEl('span', { cls: 'lucky-fe-file-name', text: file.basename });
-      if (file.stat) {
-        fileEl.createEl('span', { cls: 'lucky-fe-file-size', text: (file.stat.size / 1024).toFixed(1) + 'K' });
-      }
-      fileEl.addEventListener('click', () => { this.app.workspace.getLeaf(false).openFile(file); });
-    }
-    this.highlightActiveFile();
-  }
-
   renderTree() {
     const treeEl = this._treeEl;
     treeEl.empty();
@@ -1207,12 +1168,12 @@ class LuckyFileExplorer extends ItemView {
       const aIsFolder = a instanceof TFolder;
       const bIsFolder = b instanceof TFolder;
       if (aIsFolder !== bIsFolder) return aIsFolder ? -1 : 1;
-      if (sm === 'alphabeticalReverse') return b.name.localeCompare(a.name, 'zh-CN');
+      if (sm === 'alphabeticalReverse') return ZH_COLLATOR.compare(b.name, a.name);
       if (sm === 'byModifiedTime' && a.stat && b.stat) return b.stat.mtime - a.stat.mtime;
       if (sm === 'byModifiedTimeReverse' && a.stat && b.stat) return a.stat.mtime - b.stat.mtime;
       if (sm === 'byCreatedTime' && a.stat && b.stat) return b.stat.ctime - a.stat.ctime;
       if (sm === 'byCreatedTimeReverse' && a.stat && b.stat) return a.stat.ctime - b.stat.ctime;
-      return a.name.localeCompare(b.name, 'zh-CN');
+      return ZH_COLLATOR.compare(a.name, b.name);
     });
 
     for (const child of children) {
