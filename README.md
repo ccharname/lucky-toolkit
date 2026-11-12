@@ -75,7 +75,7 @@ cp manifest.json main.js styles.css ~/obsidian/<vault>/.obsidian/plugins/lucky-t
 
 ## 4.0.8（本机候选，2026-11-12）
 
-呼吸感改为靠组间留白而非行高：行高30px，根目录间隔6px，展开的根目录子项上2px下8px，目录与根级文件之间16px，列表四周留白10px/底部20px；计数默认0.6透明度、悬停显示；根目录图标默认灰色，仅当前笔记所在根目录保留强调色（`main.js` 在 `highlightActiveFile` 标记 `is-active-root`）。日历与文件列表改用正文等宽字体（`var(--font-text)`，桌面 JetBrainsMono Nerd Font Mono + HarmonyOS Sans，移动端随美化模式回落系统字体），名称字距 -0.02em 以适配窄侧栏。桌面端视觉居中：日历周号列收至14px并整体左移8.5px，使七列日期与标题同一中线；文件列表展开箭头左挂6px、行右侧内边距14px，使图标至计数段与工具栏同一中线（移动端保持原布局）。日历标题使用得意黑（`--lucky-font-heading`）。
+呼吸感改为靠组间留白而非行高：行高30px，根目录间隔6px，展开的根目录子项上2px下8px，目录与根级文件之间16px，列表四周留白10px/底部20px；计数默认0.6透明度、悬停显示；根目录图标默认灰色，仅当前笔记所在根目录保留强调色（`main.js` 在 `highlightActiveFile` 标记 `is-active-root`）。日历与文件列表改用正文等宽字体（`var(--font-text)`，桌面 JetBrainsMono Nerd Font Mono + HarmonyOS Sans，移动端随美化模式回落系统字体），名称字距 -0.02em 以适配窄侧栏。桌面端视觉居中取中点：周号列/展开箭头仍有视觉分量，只把约一半挂进左留白——日历周号列14px、网格左移4px，列表箭头左挂6px、行右内边距8px，日期体与列表主体均在中线右侧约3–4.5px（按主体严格居中反而显得偏左；移动端保持原布局）。日历标题使用得意黑（`--lucky-font-heading`）。
 
 ## 4.0.7（本机候选，2026-11-12）
 

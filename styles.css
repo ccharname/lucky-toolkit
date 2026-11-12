@@ -673,10 +673,11 @@ body.lucky-hide-vault:not(.is-mobile) .workspace-split.mod-left-split .workspace
   grid-template-columns: 14px repeat(7, minmax(0, 1fr));
   gap: 3px;
   padding: 0 2px;
-  /* Optical centering: hang the week-number gutter into the left padding so
-     the seven day columns share the header's center line. (14px + 3px gap) / 2 */
-  margin-left: -8.5px;
-  margin-right: 8.5px;
+  /* Optical centering: the faint week-number gutter still carries some visual
+     weight, so shift about half of it (8.5px) into the left padding rather than
+     all of it — centering only the day columns reads as left-heavy. */
+  margin-left: -4px;
+  margin-right: 4px;
 }
 
 /* --- Weekday headers --- */
@@ -1041,7 +1042,8 @@ body.lucky-hide-vault:not(.is-mobile) .workspace-split.mod-left-split .workspace
   overflow-y: auto;
   overflow-x: hidden;
   overscroll-behavior: contain;
-  /* Optical centering: 4px left vs 10px right, chevrons hang 6px, rows end 8px earlier */
+  /* Optical centering: chevrons hang 6px into a 4px left inset; rows end 2px earlier on the right.
+     Leaves the icon..count body ~4px right of center, matching the calendar's day columns. */
   padding: 10px 10px 20px 4px;
 }
 
@@ -1061,7 +1063,7 @@ body.lucky-hide-vault:not(.is-mobile) .workspace-split.mod-left-split .workspace
   gap: 6px;
   min-height: 30px;
   line-height: 22px;
-  padding: 4px 14px 4px 6px;
+  padding: 4px 8px 4px 6px;
   cursor: pointer;
   border-radius: 4px;
   transition: background 0.12s ease;
@@ -1264,7 +1266,7 @@ body.lucky-hide-vault:not(.is-mobile) .workspace-split.mod-left-split .workspace
   gap: 6px;
   min-height: 30px;
   line-height: 22px;
-  padding: 4px 14px 4px 6px;
+  padding: 4px 8px 4px 6px;
   cursor: pointer;
   border-radius: 4px;
   transition: background-color 0.12s ease, border-color 0.12s ease;
