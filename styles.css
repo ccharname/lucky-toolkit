@@ -648,6 +648,7 @@ body.lucky-hide-vault:not(.is-mobile) .workspace-split.mod-left-split .workspace
 }
 
 .lucky-cal-title {
+  font-family: var(--lucky-font-heading, 'Smiley Sans Oblique', 'Smiley Sans', '得意黑', var(--font-interface));
   flex: 1 1 auto;
   text-align: center;
   font-weight: 600;
@@ -669,9 +670,13 @@ body.lucky-hide-vault:not(.is-mobile) .workspace-split.mod-left-split .workspace
 /* --- Grid: 8 columns (week# gutter + Mon-Sun) --- */
 .lucky-cal-grid {
   display: grid;
-  grid-template-columns: 20px repeat(7, minmax(0, 1fr));
+  grid-template-columns: 14px repeat(7, minmax(0, 1fr));
   gap: 3px;
   padding: 0 2px;
+  /* Optical centering: hang the week-number gutter into the left padding so
+     the seven day columns share the header's center line. (14px + 3px gap) / 2 */
+  margin-left: -8.5px;
+  margin-right: 8.5px;
 }
 
 /* --- Weekday headers --- */
@@ -1036,7 +1041,8 @@ body.lucky-hide-vault:not(.is-mobile) .workspace-split.mod-left-split .workspace
   overflow-y: auto;
   overflow-x: hidden;
   overscroll-behavior: contain;
-  padding: 10px 10px 20px;
+  /* Optical centering: 4px left vs 10px right, chevrons hang 6px, rows end 8px earlier */
+  padding: 10px 10px 20px 4px;
 }
 
 .lucky-fe-tree::-webkit-scrollbar {
@@ -1055,7 +1061,7 @@ body.lucky-hide-vault:not(.is-mobile) .workspace-split.mod-left-split .workspace
   gap: 6px;
   min-height: 30px;
   line-height: 22px;
-  padding: 4px 6px;
+  padding: 4px 14px 4px 6px;
   cursor: pointer;
   border-radius: 4px;
   transition: background 0.12s ease;
@@ -1071,6 +1077,7 @@ body.lucky-hide-vault:not(.is-mobile) .workspace-split.mod-left-split .workspace
   align-items: center;
   justify-content: center;
   width: 14px;
+  margin-left: -6px;
   color: var(--text-faint);
   transition: transform 0.12s ease;
   flex-shrink: 0;
@@ -1106,6 +1113,7 @@ body.lucky-hide-vault:not(.is-mobile) .workspace-split.mod-left-split .workspace
 
 .lucky-fe-file-icon {
   opacity: 0.45;
+  margin-left: -6px; /* stays in the chevron column */
 }
 
 .lucky-fe-file-icon svg {
@@ -1256,7 +1264,7 @@ body.lucky-hide-vault:not(.is-mobile) .workspace-split.mod-left-split .workspace
   gap: 6px;
   min-height: 30px;
   line-height: 22px;
-  padding: 4px 6px;
+  padding: 4px 14px 4px 6px;
   cursor: pointer;
   border-radius: 4px;
   transition: background-color 0.12s ease, border-color 0.12s ease;
@@ -1555,6 +1563,19 @@ body.is-mobile .lucky-cal-nav {
 
 body.is-mobile .lucky-cal-grid {
     gap: 5px;
+    /* Desktop optical-centering offsets are not verified on touch layouts */
+    grid-template-columns: 20px repeat(7, minmax(0, 1fr));
+    margin-left: 0;
+    margin-right: 0;
+}
+
+body.is-mobile .lucky-fe-tree {
+    padding: 10px 10px 20px;
+}
+
+body.is-mobile .lucky-fe-arrow,
+body.is-mobile .lucky-fe-file-icon {
+    margin-left: 0;
 }
 
 body.is-mobile .lucky-cal-weekday {
