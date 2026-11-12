@@ -597,8 +597,8 @@ body.lucky-hide-vault:not(.is-mobile) .workspace-split.mod-left-split .workspace
 
 .lucky-cal-container {
   padding: 6px 4px 4px;
-  /* Force UI font across platforms — don't inherit --font-text which may be a serif */
-  font-family: var(--font-interface);
+  /* Share the editor's monospace stack (lucky-beautify sets --font-text; mobile swaps it for system UI) */
+  font-family: var(--font-text, var(--font-interface));
   font-feature-settings: "tnum" 1;
   --lucky-cal-weekend: light-dark(#E04F5F, #FF6B7A);
   --lucky-cal-today-bg: light-dark(#FFCF40, #FFD75E);
@@ -991,7 +991,7 @@ body.lucky-hide-vault:not(.is-mobile) .workspace-split.mod-left-split .workspace
   padding: 0;
   overflow: hidden;
   font-size: 13px;
-  font-family: var(--font-interface);
+  font-family: var(--font-text, var(--font-interface));
 }
 
 /* --- Top toolbar: flush to the top, centered row of action buttons --- */
@@ -1133,7 +1133,7 @@ body.lucky-hide-vault:not(.is-mobile) .workspace-split.mod-left-split .workspace
 .lucky-fe-root-folder .lucky-fe-folder-name {
   font-size: 14px;
   font-weight: 500;
-  letter-spacing: 0;
+  letter-spacing: -0.02em;
 }
 
 .lucky-fe-root-folder .lucky-fe-icon {
@@ -1173,6 +1173,7 @@ body.lucky-hide-vault:not(.is-mobile) .workspace-split.mod-left-split .workspace
 
 /* Sub-folder depth cascade — only weight + color, keep same font-size for visual harmony */
 .lucky-fe-folder-name {
+  letter-spacing: -0.02em; /* mono runs wide in narrow sidebars */
   font-weight: 500;
   font-size: 13px;
   color: var(--text-normal);
@@ -1204,7 +1205,7 @@ body.lucky-hide-vault:not(.is-mobile) .workspace-split.mod-left-split .workspace
 
 .lucky-fe-count {
   font-size: 11px;
-  font-family: var(--font-interface);
+  font-family: inherit;
   font-variant-numeric: tabular-nums;
   color: var(--text-faint);
   background: transparent;
@@ -1273,6 +1274,7 @@ body.lucky-hide-vault:not(.is-mobile) .workspace-split.mod-left-split .workspace
 }
 
 .lucky-fe-file-name {
+  letter-spacing: -0.02em; /* mono runs wide in narrow sidebars */
   color: var(--text-muted);
   font-weight: 400;
   font-size: 12px;
