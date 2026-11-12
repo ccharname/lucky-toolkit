@@ -1109,8 +1109,8 @@ body.lucky-hide-vault:not(.is-mobile) .workspace-split.mod-left-split .workspace
 }
 
 .lucky-fe-file-icon svg {
-  width: 16px;
-  height: 16px;
+  width: 15px;
+  height: 15px;
 }
 
 /* Root folders: moderate size, hierarchy from weight; rows stay airy. */
@@ -1245,7 +1245,7 @@ body.lucky-hide-vault:not(.is-mobile) .workspace-split.mod-left-split .workspace
 .lucky-fe-file-name {
   color: var(--text-muted);
   font-weight: 400;
-  font-size: 15px;
+  font-size: 14px;
   flex: 1;
   min-width: 0;
   white-space: nowrap;
