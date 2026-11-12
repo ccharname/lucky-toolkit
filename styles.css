@@ -982,17 +982,21 @@ body.lucky-hide-vault:not(.is-mobile) .workspace-split.mod-left-split .workspace
 
 /* ===== Feature 12: File Explorer ===== */
 
-.lucky-fe-container {
+.workspace-leaf-content .view-content.lucky-fe-container {
   display: flex;
   flex-direction: column;
   height: 100%;
+  min-height: 0;
+  min-width: 0;
   padding: 0;
+  overflow: hidden;
   font-size: 13px;
   font-family: var(--font-interface);
 }
 
 /* --- Top toolbar: flush to the top, centered row of action buttons --- */
 .lucky-fe-container > .nav-header {
+  flex: 0 0 auto;
   padding: 2px 8px 4px;
   margin: 0;
   border-bottom: 1px solid var(--background-modifier-border);
@@ -1027,8 +1031,12 @@ body.lucky-hide-vault:not(.is-mobile) .workspace-split.mod-left-split .workspace
 /* Tree container */
 .lucky-fe-tree {
   flex: 1;
+  min-height: 0;
+  min-width: 0;
   overflow-y: auto;
-  padding: 4px 0 8px;
+  overflow-x: hidden;
+  overscroll-behavior: contain;
+  padding: 4px 4px 8px;
 }
 
 .lucky-fe-tree::-webkit-scrollbar {
@@ -1044,8 +1052,10 @@ body.lucky-hide-vault:not(.is-mobile) .workspace-split.mod-left-split .workspace
 .lucky-fe-folder-title {
   display: flex;
   align-items: center;
-  gap: 6px;
-  padding: 3px 8px 3px 8px;
+  gap: 5px;
+  min-height: 24px;
+  line-height: 1.4;
+  padding: 3px 6px;
   cursor: pointer;
   border-radius: 4px;
   transition: background 0.12s ease;
@@ -1103,17 +1113,15 @@ body.lucky-hide-vault:not(.is-mobile) .workspace-split.mod-left-split .workspace
   height: 13px;
 }
 
-/* Root-level folders: larger, more breathing room, hairline divider between */
+/* Root-level folders keep a light hierarchy without increasing row height. */
 .lucky-fe-root-folder {
-  padding-top: 5px;
-  padding-bottom: 5px;
-  margin-top: 1px;
+  margin-top: 0;
 }
 
 .lucky-fe-root-folder .lucky-fe-folder-name {
-  font-size: 14px;
-  font-weight: 600;
-  letter-spacing: 0.01em;
+  font-size: 13px;
+  font-weight: 500;
+  letter-spacing: 0;
 }
 
 .lucky-fe-root-folder .lucky-fe-icon {
@@ -1150,6 +1158,7 @@ body.lucky-hide-vault:not(.is-mobile) .workspace-split.mod-left-split .workspace
   font-size: 13px;
   color: var(--text-normal);
   flex: 1;
+  min-width: 0;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -1175,17 +1184,17 @@ body.lucky-hide-vault:not(.is-mobile) .workspace-split.mod-left-split .workspace
 }
 
 .lucky-fe-count {
-  font-size: 10px;
-  font-family: var(--font-monospace, monospace);
+  font-size: 11px;
+  font-family: var(--font-interface);
   font-variant-numeric: tabular-nums;
-  color: var(--text-faint);
-  background: var(--background-modifier-hover);
-  padding: 0 6px;
+  color: var(--text-muted);
+  background: transparent;
+  padding: 0 4px;
   border-radius: 8px;
   min-width: 18px;
   height: 16px;
   line-height: 16px;
-  text-align: center;
+  text-align: right;
   flex-shrink: 0;
 }
 
@@ -1213,8 +1222,10 @@ body.lucky-hide-vault:not(.is-mobile) .workspace-split.mod-left-split .workspace
 .lucky-fe-file {
   display: flex;
   align-items: center;
-  gap: 6px;
-  padding: 3px 8px;
+  gap: 5px;
+  min-height: 24px;
+  line-height: 1.4;
+  padding: 3px 6px;
   cursor: pointer;
   border-radius: 4px;
   transition: background-color 0.12s ease, border-color 0.12s ease;
@@ -1228,14 +1239,15 @@ body.lucky-hide-vault:not(.is-mobile) .workspace-split.mod-left-split .workspace
   background: color-mix(in srgb, var(--interactive-accent) 10%, transparent);
   border-left: 2px solid var(--interactive-accent);
   border-radius: 0 4px 4px 0;
-  padding-left: 6px; /* compensate 2px border so text doesn't shift */
+  padding-left: 4px; /* compensate 2px border so text doesn't shift */
 }
 
 .lucky-fe-file-name {
   color: var(--text-muted);
   font-weight: 400;
-  font-size: 12px;
+  font-size: 13px;
   flex: 1;
+  min-width: 0;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -1247,6 +1259,7 @@ body.lucky-hide-vault:not(.is-mobile) .workspace-split.mod-left-split .workspace
 }
 
 .lucky-fe-file-size {
+  display: none;
   font-size: 10px;
   font-family: var(--font-monospace, monospace);
   font-variant-numeric: tabular-nums;
@@ -1547,7 +1560,7 @@ body.is-mobile .lucky-cal-footer {
 }
 
 /* --- File List mobile (Feature 12) — +2 from desktop sizes, inherit shape --- */
-body.is-mobile .lucky-fe-container {
+body.is-mobile .workspace-leaf-content .view-content.lucky-fe-container {
     font-size: 18px;
 }
 
@@ -1647,6 +1660,7 @@ body.is-mobile .lucky-fe-children {
 
 /* Show file size always on mobile (no hover on touch) */
 body.is-mobile .lucky-fe-file-size {
+    display: inline;
     opacity: 0.55;
     font-size: 13px;
 }
