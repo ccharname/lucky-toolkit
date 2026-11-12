@@ -1,7 +1,7 @@
 {
   "id": "lucky-toolkit",
   "name": "Lucky Toolkit",
-  "version": "4.0.7",
+  "version": "4.0.8",
   "minAppVersion": "1.5.8",
   "description": "Consolidated toolkit: beautify, hider, tab manager, note count, tag wrangler, calendar view, auto link title, reading time, focus mode, file explorer, recent files, orphan notes",
   "author": "zheng",

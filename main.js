@@ -1284,6 +1284,7 @@ class LuckyFileExplorer extends ItemView {
         const titleCls = 'lucky-fe-folder-title' + (depth === 0 ? ' lucky-fe-root-folder' : '');
         const titleEl = folderEl.createEl('div', { cls: titleCls });
         titleEl.setAttribute('data-depth', String(depth));
+        if (depth === 0) titleEl.setAttribute('data-path', folderPath);
         // Cached count
         const mdCount = this.getMdCount(child);
 
@@ -1426,7 +1427,14 @@ class LuckyFileExplorer extends ItemView {
       // Always clear the old highlight first — even when the new active file's
       // row isn't rendered (collapsed folder), a stale highlight must not linger
       container.querySelectorAll('.lucky-fe-file.is-active').forEach((el) => el.removeClass('is-active'));
+      container.querySelectorAll('.lucky-fe-root-folder.is-active-root').forEach((el) => el.removeClass('is-active-root'));
       if (!activeFile) return;
+
+      // Only the root folder that contains the active note keeps its accent icon.
+      const slash = activeFile.path.indexOf('/');
+      if (slash > 0) {
+        container.querySelector(`.lucky-fe-root-folder[data-path="${CSS.escape(activeFile.path.slice(0, slash))}"]`)?.addClass('is-active-root');
+      }
 
       const escaped = CSS.escape(activeFile.path);
       const existing = container.querySelector(`.lucky-fe-file[data-path="${escaped}"]`);

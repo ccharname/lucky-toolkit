@@ -1036,7 +1036,7 @@ body.lucky-hide-vault:not(.is-mobile) .workspace-split.mod-left-split .workspace
   overflow-y: auto;
   overflow-x: hidden;
   overscroll-behavior: contain;
-  padding: 4px 4px 8px;
+  padding: 10px 10px 20px;
 }
 
 .lucky-fe-tree::-webkit-scrollbar {
@@ -1053,9 +1053,9 @@ body.lucky-hide-vault:not(.is-mobile) .workspace-split.mod-left-split .workspace
   display: flex;
   align-items: center;
   gap: 6px;
-  min-height: 36px;
-  line-height: 24px;
-  padding: 6px 6px;
+  min-height: 30px;
+  line-height: 22px;
+  padding: 4px 6px;
   cursor: pointer;
   border-radius: 4px;
   transition: background 0.12s ease;
@@ -1113,9 +1113,21 @@ body.lucky-hide-vault:not(.is-mobile) .workspace-split.mod-left-split .workspace
   height: 13px;
 }
 
-/* Root folders: moderate size, hierarchy from weight; rows stay airy. */
+/* Breathing room comes from spacing between groups, not from tall rows. */
 .lucky-fe-root-folder {
   margin-top: 0;
+}
+
+.lucky-fe-tree > .lucky-fe-folder + .lucky-fe-folder > .lucky-fe-root-folder {
+  margin-top: 6px;
+}
+
+.lucky-fe-tree > .lucky-fe-folder + .lucky-fe-file {
+  margin-top: 16px;
+}
+
+.lucky-fe-folder + .lucky-fe-file {
+  margin-top: 6px;
 }
 
 .lucky-fe-root-folder .lucky-fe-folder-name {
@@ -1125,11 +1137,18 @@ body.lucky-hide-vault:not(.is-mobile) .workspace-split.mod-left-split .workspace
 }
 
 .lucky-fe-root-folder .lucky-fe-icon {
-  color: var(--interactive-accent);
+  color: var(--text-muted);
   opacity: 0.8;
+  transition: color 0.12s ease, opacity 0.12s ease;
 }
 
 .lucky-fe-root-folder:hover .lucky-fe-icon {
+  opacity: 1;
+}
+
+/* Only the root folder holding the active note keeps the accent color. */
+.lucky-fe-root-folder.is-active-root .lucky-fe-icon {
+  color: var(--interactive-accent);
   opacity: 1;
 }
 
@@ -1196,6 +1215,12 @@ body.lucky-hide-vault:not(.is-mobile) .workspace-split.mod-left-split .workspace
   line-height: 16px;
   text-align: right;
   flex-shrink: 0;
+  opacity: 0.6;
+  transition: opacity 0.12s ease;
+}
+
+.lucky-fe-folder-title:hover .lucky-fe-count {
+  opacity: 1;
 }
 
 /* Children indent guide — one consistent step per depth */
@@ -1203,6 +1228,11 @@ body.lucky-hide-vault:not(.is-mobile) .workspace-split.mod-left-split .workspace
   border-left: 1px solid light-dark(hsl(0, 0%, 88%), hsl(0, 0%, 22%));
   margin-left: 14px;
   position: relative;
+}
+
+.lucky-fe-folder-title[data-depth="0"] + .lucky-fe-children {
+  margin-top: 2px;
+  margin-bottom: 8px;
 }
 
 .lucky-fe-folder-title[data-depth="0"] + .lucky-fe-children {
@@ -1223,9 +1253,9 @@ body.lucky-hide-vault:not(.is-mobile) .workspace-split.mod-left-split .workspace
   display: flex;
   align-items: center;
   gap: 6px;
-  min-height: 36px;
-  line-height: 24px;
-  padding: 6px 6px;
+  min-height: 30px;
+  line-height: 22px;
+  padding: 4px 6px;
   cursor: pointer;
   border-radius: 4px;
   transition: background-color 0.12s ease, border-color 0.12s ease;
