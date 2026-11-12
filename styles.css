@@ -990,7 +990,7 @@ body.lucky-hide-vault:not(.is-mobile) .workspace-split.mod-left-split .workspace
   min-width: 0;
   padding: 0;
   overflow: hidden;
-  font-size: 14px;
+  font-size: 13px;
   font-family: var(--font-interface);
 }
 
@@ -1100,8 +1100,8 @@ body.lucky-hide-vault:not(.is-mobile) .workspace-split.mod-left-split .workspace
 }
 
 .lucky-fe-icon svg {
-  width: 15px;
-  height: 15px;
+  width: 14px;
+  height: 14px;
 }
 
 .lucky-fe-file-icon {
@@ -1109,8 +1109,8 @@ body.lucky-hide-vault:not(.is-mobile) .workspace-split.mod-left-split .workspace
 }
 
 .lucky-fe-file-icon svg {
-  width: 14px;
-  height: 14px;
+  width: 13px;
+  height: 13px;
 }
 
 /* Root folders: moderate size, hierarchy from weight; rows stay airy. */
@@ -1119,7 +1119,7 @@ body.lucky-hide-vault:not(.is-mobile) .workspace-split.mod-left-split .workspace
 }
 
 .lucky-fe-root-folder .lucky-fe-folder-name {
-  font-size: 15px;
+  font-size: 14px;
   font-weight: 500;
   letter-spacing: 0;
 }
@@ -1134,8 +1134,8 @@ body.lucky-hide-vault:not(.is-mobile) .workspace-split.mod-left-split .workspace
 }
 
 .lucky-fe-root-folder .lucky-fe-icon svg {
-  width: 17px;
-  height: 17px;
+  width: 16px;
+  height: 16px;
 }
 
 .lucky-fe-root-folder .lucky-fe-arrow svg {
@@ -1155,7 +1155,7 @@ body.lucky-hide-vault:not(.is-mobile) .workspace-split.mod-left-split .workspace
 /* Sub-folder depth cascade — only weight + color, keep same font-size for visual harmony */
 .lucky-fe-folder-name {
   font-weight: 500;
-  font-size: 14px;
+  font-size: 13px;
   color: var(--text-normal);
   flex: 1;
   min-width: 0;
@@ -1171,7 +1171,7 @@ body.lucky-hide-vault:not(.is-mobile) .workspace-split.mod-left-split .workspace
 
 .lucky-fe-folder-title[data-depth="2"] .lucky-fe-folder-name {
   font-weight: 400;
-  font-size: 14px;
+  font-size: 13px;
   color: var(--text-muted);
 }
 
@@ -1179,12 +1179,12 @@ body.lucky-hide-vault:not(.is-mobile) .workspace-split.mod-left-split .workspace
 .lucky-fe-folder-title[data-depth="4"] .lucky-fe-folder-name,
 .lucky-fe-folder-title[data-depth="5"] .lucky-fe-folder-name {
   font-weight: 400;
-  font-size: 14px;
+  font-size: 13px;
   color: var(--text-faint);
 }
 
 .lucky-fe-count {
-  font-size: 12px;
+  font-size: 11px;
   font-family: var(--font-interface);
   font-variant-numeric: tabular-nums;
   color: var(--text-faint);
@@ -1245,7 +1245,7 @@ body.lucky-hide-vault:not(.is-mobile) .workspace-split.mod-left-split .workspace
 .lucky-fe-file-name {
   color: var(--text-muted);
   font-weight: 400;
-  font-size: 13px;
+  font-size: 12px;
   flex: 1;
   min-width: 0;
   white-space: nowrap;
