@@ -1052,7 +1052,7 @@ body.lucky-hide-vault:not(.is-mobile) .workspace-split.mod-left-split .workspace
 .lucky-fe-folder-title {
   display: flex;
   align-items: center;
-  gap: 5px;
+  gap: 6px;
   min-height: 36px;
   line-height: 24px;
   padding: 6px 6px;
@@ -1070,15 +1070,15 @@ body.lucky-hide-vault:not(.is-mobile) .workspace-split.mod-left-split .workspace
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 14px;
+  width: 16px;
   color: var(--text-faint);
   transition: transform 0.12s ease;
   flex-shrink: 0;
 }
 
 .lucky-fe-arrow svg {
-  width: 12px;
-  height: 12px;
+  width: 13px;
+  height: 13px;
   stroke-width: 2.5px;
 }
 
@@ -1100,8 +1100,8 @@ body.lucky-hide-vault:not(.is-mobile) .workspace-split.mod-left-split .workspace
 }
 
 .lucky-fe-icon svg {
-  width: 14px;
-  height: 14px;
+  width: 17px;
+  height: 17px;
 }
 
 .lucky-fe-file-icon {
@@ -1109,8 +1109,8 @@ body.lucky-hide-vault:not(.is-mobile) .workspace-split.mod-left-split .workspace
 }
 
 .lucky-fe-file-icon svg {
-  width: 13px;
-  height: 13px;
+  width: 16px;
+  height: 16px;
 }
 
 /* Root folders: moderate size, hierarchy from weight; rows stay airy. */
@@ -1134,13 +1134,13 @@ body.lucky-hide-vault:not(.is-mobile) .workspace-split.mod-left-split .workspace
 }
 
 .lucky-fe-root-folder .lucky-fe-icon svg {
-  width: 16px;
-  height: 16px;
+  width: 19px;
+  height: 19px;
 }
 
 .lucky-fe-root-folder .lucky-fe-arrow svg {
-  width: 13px;
-  height: 13px;
+  width: 14px;
+  height: 14px;
 }
 
 /* Non-root folders carry the generic folder/folder-open icon — keep it subtle */
@@ -1222,7 +1222,7 @@ body.lucky-hide-vault:not(.is-mobile) .workspace-split.mod-left-split .workspace
 .lucky-fe-file {
   display: flex;
   align-items: center;
-  gap: 5px;
+  gap: 6px;
   min-height: 36px;
   line-height: 24px;
   padding: 6px 6px;
