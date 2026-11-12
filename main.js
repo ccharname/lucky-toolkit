@@ -522,13 +522,17 @@ class LuckyToolkit extends Plugin {
             if (t.tag !== hashOld && !t.tag.startsWith(hashOld + '/')) continue;
             const start = t.position.start.offset;
             const end = start + hashOld.length; // only the '#old' prefix — keeps '/child'
-            if (newContent.slice(start, end) !== hashOld) continue;
+            const tagEnd = start + t.tag.length;
+            if (newContent.slice(start, tagEnd) !== t.tag) continue;
+            if (/^[\p{L}\p{M}\p{N}_/-]/u.test(newContent.slice(tagEnd))) continue;
             newContent = newContent.slice(0, start) + '#' + newTag + newContent.slice(end);
           }
           const fmMatch = newContent.match(/^---\r?\n[\s\S]*?\r?\n---/);
           if (fmMatch) {
+            // List values in aliases or other YAML properties are not tags.
             const fm = fmMatch[0]
-              .replace(fmListRegex, '$1' + newTagSafe + '$2')
+              .replace(/^[Tt]ags?:[^\r\n]*(?:\r?\n(?:[ \t]+[^\r\n]*|-[ \t]+[^\r\n]*|[ \t]*(?:#[^\r\n]*)?))*/gm,
+                (field) => field.replace(fmListRegex, '$1' + newTagSafe + '$2'))
               .replace(fmScalarRegex, '$1' + newTagSafe + '$2')
               .replace(fmArrayLineRegex, (line, pre, body, post) =>
                 pre + body.split(',').map((tok) => {
@@ -827,10 +831,16 @@ class LuckyCalendarView extends ItemView {
     this.scanDailyNotes();
     this.render();
     const refresh = debounce(() => { this.scanDailyNotes(); this.render(); }, 1000, true);
-    this.registerEvent(this.app.vault.on('create', refresh));
-    this.registerEvent(this.app.vault.on('delete', refresh));
-    this.registerEvent(this.app.vault.on('rename', refresh));
-    this.registerEvent(this.app.vault.on('modify', refresh)); // heat dots track file size
+    const dailyRoot = '10-Journal/Daily';
+    const affectsDailyNotes = (path) => typeof path === 'string' &&
+      (path === '/' || path === dailyRoot || path.startsWith(dailyRoot + '/') || dailyRoot.startsWith(path + '/'));
+    const onDailyChange = (file, oldPath) => {
+      if (affectsDailyNotes(file?.path) || affectsDailyNotes(oldPath)) refresh();
+    };
+    this.registerEvent(this.app.vault.on('create', onDailyChange));
+    this.registerEvent(this.app.vault.on('delete', onDailyChange));
+    this.registerEvent(this.app.vault.on('rename', onDailyChange));
+    this.registerEvent(this.app.vault.on('modify', onDailyChange)); // heat dots track file size
   }
 
   scanDailyNotes() {

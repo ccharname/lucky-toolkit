@@ -4,7 +4,7 @@
 
 个人整合的 Obsidian 插件，把十多个常用小功能合并到单个插件里，便于一处管理。
 
-- **Version**: 4.0.5
+- **Version**: 4.0.6
 - **Min Obsidian Version**: 1.5.8
 - **Author**: zheng
 - **Platform**: Desktop & Mobile
@@ -64,3 +64,13 @@ cp manifest.json main.js styles.css ~/obsidian/<vault>/.obsidian/plugins/lucky-t
 3. 在 Obsidian 中使用 `Cmd+P → Reload app without saving` 或通过 BRAT / Hot-Reload 插件重载
 
 如需 TypeScript 化或 esbuild 打包，可作为后续迭代方向。
+
+## 4.0.6（本机候选，2026-11-12）
+
+修正标签批量重命名误改其他 YAML 列表、缓存滞后时误改较长标签；日历只响应日记目录相关事件。
+
+行为回归：
+
+```bash
+node --test test-behavior.cjs
+```
