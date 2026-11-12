@@ -990,7 +990,7 @@ body.lucky-hide-vault:not(.is-mobile) .workspace-split.mod-left-split .workspace
   min-width: 0;
   padding: 0;
   overflow: hidden;
-  font-size: 13px;
+  font-size: 16px;
   font-family: var(--font-interface);
 }
 
@@ -1119,7 +1119,7 @@ body.lucky-hide-vault:not(.is-mobile) .workspace-split.mod-left-split .workspace
 }
 
 .lucky-fe-root-folder .lucky-fe-folder-name {
-  font-size: 14px;
+  font-size: 16px;
   font-weight: 600;
   letter-spacing: 0;
 }
@@ -1155,7 +1155,7 @@ body.lucky-hide-vault:not(.is-mobile) .workspace-split.mod-left-split .workspace
 /* Sub-folder depth cascade — only weight + color, keep same font-size for visual harmony */
 .lucky-fe-folder-name {
   font-weight: 500;
-  font-size: 13px;
+  font-size: 16px;
   color: var(--text-normal);
   flex: 1;
   min-width: 0;
@@ -1171,7 +1171,7 @@ body.lucky-hide-vault:not(.is-mobile) .workspace-split.mod-left-split .workspace
 
 .lucky-fe-folder-title[data-depth="2"] .lucky-fe-folder-name {
   font-weight: 400;
-  font-size: 12.5px;
+  font-size: 16px;
   color: var(--text-muted);
 }
 
@@ -1179,12 +1179,12 @@ body.lucky-hide-vault:not(.is-mobile) .workspace-split.mod-left-split .workspace
 .lucky-fe-folder-title[data-depth="4"] .lucky-fe-folder-name,
 .lucky-fe-folder-title[data-depth="5"] .lucky-fe-folder-name {
   font-weight: 400;
-  font-size: 12.5px;
+  font-size: 16px;
   color: var(--text-faint);
 }
 
 .lucky-fe-count {
-  font-size: 11px;
+  font-size: 13px;
   font-family: var(--font-interface);
   font-variant-numeric: tabular-nums;
   color: var(--text-muted);
@@ -1245,7 +1245,7 @@ body.lucky-hide-vault:not(.is-mobile) .workspace-split.mod-left-split .workspace
 .lucky-fe-file-name {
   color: var(--text-muted);
   font-weight: 400;
-  font-size: 14px;
+  font-size: 16px;
   flex: 1;
   min-width: 0;
   white-space: nowrap;
