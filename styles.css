@@ -990,7 +990,7 @@ body.lucky-hide-vault:not(.is-mobile) .workspace-split.mod-left-split .workspace
   min-width: 0;
   padding: 0;
   overflow: hidden;
-  font-size: 16px;
+  font-size: 14px;
   font-family: var(--font-interface);
 }
 
@@ -1053,9 +1053,9 @@ body.lucky-hide-vault:not(.is-mobile) .workspace-split.mod-left-split .workspace
   display: flex;
   align-items: center;
   gap: 5px;
-  min-height: 24px;
-  line-height: 1.4;
-  padding: 3px 6px;
+  min-height: 32px;
+  line-height: 22px;
+  padding: 5px 6px;
   cursor: pointer;
   border-radius: 4px;
   transition: background 0.12s ease;
@@ -1113,13 +1113,13 @@ body.lucky-hide-vault:not(.is-mobile) .workspace-split.mod-left-split .workspace
   height: 13px;
 }
 
-/* Root-level folders stay readable without extra vertical padding. */
+/* Root folders sit level with the calendar title (15px/600) so the sidebar reads as one scale. */
 .lucky-fe-root-folder {
   margin-top: 0;
 }
 
 .lucky-fe-root-folder .lucky-fe-folder-name {
-  font-size: 16px;
+  font-size: 15px;
   font-weight: 600;
   letter-spacing: 0;
 }
@@ -1155,7 +1155,7 @@ body.lucky-hide-vault:not(.is-mobile) .workspace-split.mod-left-split .workspace
 /* Sub-folder depth cascade — only weight + color, keep same font-size for visual harmony */
 .lucky-fe-folder-name {
   font-weight: 500;
-  font-size: 16px;
+  font-size: 14px;
   color: var(--text-normal);
   flex: 1;
   min-width: 0;
@@ -1171,7 +1171,7 @@ body.lucky-hide-vault:not(.is-mobile) .workspace-split.mod-left-split .workspace
 
 .lucky-fe-folder-title[data-depth="2"] .lucky-fe-folder-name {
   font-weight: 400;
-  font-size: 16px;
+  font-size: 14px;
   color: var(--text-muted);
 }
 
@@ -1179,15 +1179,15 @@ body.lucky-hide-vault:not(.is-mobile) .workspace-split.mod-left-split .workspace
 .lucky-fe-folder-title[data-depth="4"] .lucky-fe-folder-name,
 .lucky-fe-folder-title[data-depth="5"] .lucky-fe-folder-name {
   font-weight: 400;
-  font-size: 16px;
+  font-size: 14px;
   color: var(--text-faint);
 }
 
 .lucky-fe-count {
-  font-size: 13px;
+  font-size: 12px;
   font-family: var(--font-interface);
   font-variant-numeric: tabular-nums;
-  color: var(--text-muted);
+  color: var(--text-faint);
   background: transparent;
   padding: 0 4px;
   border-radius: 8px;
@@ -1223,9 +1223,9 @@ body.lucky-hide-vault:not(.is-mobile) .workspace-split.mod-left-split .workspace
   display: flex;
   align-items: center;
   gap: 5px;
-  min-height: 24px;
-  line-height: 1.4;
-  padding: 3px 6px;
+  min-height: 32px;
+  line-height: 22px;
+  padding: 5px 6px;
   cursor: pointer;
   border-radius: 4px;
   transition: background-color 0.12s ease, border-color 0.12s ease;
@@ -1245,7 +1245,7 @@ body.lucky-hide-vault:not(.is-mobile) .workspace-split.mod-left-split .workspace
 .lucky-fe-file-name {
   color: var(--text-muted);
   font-weight: 400;
-  font-size: 16px;
+  font-size: 14px;
   flex: 1;
   min-width: 0;
   white-space: nowrap;
