@@ -1113,14 +1113,14 @@ body.lucky-hide-vault:not(.is-mobile) .workspace-split.mod-left-split .workspace
   height: 13px;
 }
 
-/* Root-level folders keep a light hierarchy without increasing row height. */
+/* Root-level folders stay readable without extra vertical padding. */
 .lucky-fe-root-folder {
   margin-top: 0;
 }
 
 .lucky-fe-root-folder .lucky-fe-folder-name {
-  font-size: 13px;
-  font-weight: 500;
+  font-size: 14px;
+  font-weight: 600;
   letter-spacing: 0;
 }
 
@@ -1245,7 +1245,7 @@ body.lucky-hide-vault:not(.is-mobile) .workspace-split.mod-left-split .workspace
 .lucky-fe-file-name {
   color: var(--text-muted);
   font-weight: 400;
-  font-size: 13px;
+  font-size: 14px;
   flex: 1;
   min-width: 0;
   white-space: nowrap;

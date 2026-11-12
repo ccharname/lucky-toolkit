@@ -1182,14 +1182,33 @@ class LuckyFileExplorer extends ItemView {
     this._treeEl = container.createEl('div', { cls: 'lucky-fe-tree' });
     this.renderTree();
 
-    // Refresh on vault changes — invalidate cache, re-render tree only
+    // Only displayed files affect the tree; keep unrelated folder counts cached.
     const refresh = debounce(() => {
-      this._mdCountCache.clear();
-      this.plugin._noteCountCache.clear();
       this.renderTree();
     }, 500, true);
-    this.registerEvent(this.app.vault.on('create', refresh));
-    this.registerEvent(this.app.vault.on('delete', refresh));
+    this._refreshTree = refresh;
+    const onTreeChange = (file, oldPath) => {
+      if (!(file instanceof TFolder) && !(file instanceof TFile && file.extension === 'md') && !oldPath?.endsWith('.md')) return;
+      if (file instanceof TFolder) {
+        // A moved/deleted folder can invalidate descendant cache keys as well.
+        this._mdCountCache.clear();
+        this.plugin._noteCountCache.clear();
+      } else {
+        for (const path of [file.path, oldPath]) {
+          if (!path) continue;
+          let folderPath = path;
+          do {
+            const slash = folderPath.lastIndexOf('/');
+            folderPath = slash === -1 ? '/' : folderPath.slice(0, slash) || '/';
+            this._mdCountCache.delete(folderPath);
+            this.plugin._noteCountCache.delete(folderPath);
+          } while (folderPath !== '/');
+        }
+      }
+      refresh();
+    };
+    this.registerEvent(this.app.vault.on('create', onTreeChange));
+    this.registerEvent(this.app.vault.on('delete', onTreeChange));
     this.registerEvent(this.app.vault.on('rename', (file, oldPath) => {
       // Migrate expanded state (folder itself + expanded descendants) to new path
       if (this.expandedFolders.delete(oldPath)) this.expandedFolders.add(file.path);
@@ -1200,10 +1219,12 @@ class LuckyFileExplorer extends ItemView {
           this.expandedFolders.add(file.path + '/' + p.slice(prefix.length));
         }
       }
-      refresh();
+      onTreeChange(file, oldPath);
     }));
     this.registerEvent(this.app.workspace.on('file-open', () => {
-      window.requestAnimationFrame(() => {
+      if (this._fileOpenFrame != null) return;
+      this._fileOpenFrame = window.requestAnimationFrame(() => {
+        this._fileOpenFrame = null;
         this.highlightActiveFile();
         if (this._autoReveal) {
           const activeEl = this.containerEl.querySelector('.lucky-fe-file.is-active');
@@ -1213,6 +1234,12 @@ class LuckyFileExplorer extends ItemView {
     }));
   }
 
+  async onClose() {
+    this._refreshTree?.cancel();
+    if (this._fileOpenFrame != null) window.cancelAnimationFrame(this._fileOpenFrame);
+    this._fileOpenFrame = null;
+  }
+
   // Cached md file count — built once per vault change, reused across render
   getMdCount(folder) {
     return countMdInFolder(folder, this._mdCountCache);
@@ -1220,9 +1247,11 @@ class LuckyFileExplorer extends ItemView {
 
   renderTree() {
     const treeEl = this._treeEl;
+    const scrollTop = treeEl.scrollTop;
     treeEl.empty();
     const root = this.app.vault.getRoot();
     this.renderFolder(treeEl, root, 0, true);
+    treeEl.scrollTop = scrollTop;
     this.highlightActiveFile();
   }
 
@@ -1232,7 +1261,8 @@ class LuckyFileExplorer extends ItemView {
 
     // Sort: folders first, then files; 6 native sort modes
     const sm = this._sortMode;
-    const children = [...folder.children].sort((a, b) => {
+    const children = folder.children.filter((child) => !child.name.startsWith('.') &&
+      (child instanceof TFolder || child instanceof TFile && child.extension === 'md')).sort((a, b) => {
       const aIsFolder = a instanceof TFolder;
       const bIsFolder = b instanceof TFolder;
       if (aIsFolder !== bIsFolder) return aIsFolder ? -1 : 1;
@@ -1245,9 +1275,6 @@ class LuckyFileExplorer extends ItemView {
     });
 
     for (const child of children) {
-      // Skip hidden folders
-      if (child.name.startsWith('.')) continue;
-
       if (child instanceof TFolder) {
         const folderPath = child.path;
         const isExpanded = this.expandedFolders.has(folderPath);
