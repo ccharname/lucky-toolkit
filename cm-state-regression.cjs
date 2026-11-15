@@ -56,3 +56,18 @@ test('unload restores both pending placeholders in one actual CM document', asyn
   assert.equal(ed.getValue(), afterUnload, 'late native responses must not edit after cleanup');
   assert.equal(f.plugin._linkTitleRequests, 0); assert.equal(f.plugin._linkTitleOperations.size, 0);
 });
+test('actual Component order removes the CM extension before restoring both pending ranges', async () => {
+  const gets = [], f = fixture(o => o.method === 'HEAD' ? html('Head') : (() => { const d = deferred(); gets.push(d); return d.promise; })());
+  const ed = nativeEditor(f), first = f.paste(ed); await flush();
+  ed.change(ed.getValue().length, ed.getValue().length, '\n'); ed.setCursor(ed.getValue().length);
+  const second = f.paste(ed); await flush();
+  assert.equal(f.plugin._linkTitleRequests, 2);
+  f.plugin.unload(); assert.equal(f.plugin.extension, null);
+  await Promise.all([first.promise, second.promise]);
+  const afterUnload = ed.getValue();
+  assert.equal(f.plugin._linkTitleRequests, 2, 'component cleanup must not release unresolved native slots');
+  gets.forEach(get => get.resolve(html('Late'))); await flush();
+  assert.equal(afterUnload, 'https://example.com/page\nhttps://example.com/page');
+  assert.equal(ed.getValue(), afterUnload, 'late native results must not edit after Component cleanup');
+  assert.equal(f.plugin._linkTitleRequests, 0); assert.equal(f.plugin._linkTitleOperations.size, 0);
+});

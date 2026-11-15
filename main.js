@@ -727,8 +727,32 @@ class LuckyToolkit extends Plugin {
       const from = editor.offsetToPos(operation.fromOffset);
       const to = editor.offsetToPos(operation.toOffset);
       if (editor.getRange(from, to) !== operation.placeholder) return false;
+      const cleanupDoc = allowUnloading && operation.view ? operation.view.state.doc : null;
+      const cleanupText = cleanupDoc ? cleanupDoc.toString() : null;
       operation.replacing = true;
       if (replacement !== operation.placeholder) editor.replaceRange(replacement, from, to);
+      if (cleanupDoc && replacement !== operation.placeholder) {
+        // Component removes editor extensions before onunload. Map only this verified
+        // synchronous edit, and skip ranges an installed tracker has already mapped.
+        const nextDoc = operation.view.state.doc;
+        const expected = cleanupText.slice(0, operation.fromOffset) + replacement + cleanupText.slice(operation.toOffset);
+        if (nextDoc.toString() === expected) {
+          const delta = replacement.length - (operation.toOffset - operation.fromOffset);
+          for (const pending of this._linkTitleOperations || []) {
+            if (pending === operation || pending.view !== operation.view || pending.cancelled || pending.doc !== cleanupDoc) continue;
+            if (cleanupText.slice(pending.fromOffset, pending.toOffset) !== pending.placeholder) continue;
+            if (pending.fromOffset >= operation.toOffset) {
+              pending.fromOffset += delta;
+              pending.toOffset += delta;
+            } else if (pending.toOffset > operation.fromOffset) {
+              pending.cancelled = true;
+              pending.cancelWait?.();
+              continue;
+            }
+            pending.doc = nextDoc;
+          }
+        }
+      }
       return true;
     } catch (_) { return false; }
     finally { operation.replacing = false; }
