@@ -1,0 +1,9 @@
+{
+  "repository": "ccharname/lucky-toolkit",
+  "pluginId": "lucky-toolkit",
+  "assets": [
+    "main.js",
+    "manifest.json",
+    "styles.css"
+  ]
+}
