@@ -12,9 +12,15 @@ function fixture(responder = () => html('Example'), options = {}) {
   const app = { workspace: { on: (name, fn) => { events.set(name, fn); return {}; }, onLayoutReady: fn => ready.push(fn), detachLeavesOfType() {} } };
   class Empty {}
   class Plugin {
-    constructor() { this.app = app; }
+    constructor() { this.app = app; this._loaded = true; this._children = []; this._events = []; }
     loadData() { return Promise.resolve({}); }
-    registerEvent() {} registerView() {} registerDomEvent() {} addSettingTab() {} addCommand() {} registerEditorExtension(extension) { this.extension = extension; }
+    registerEvent() {} registerView() {} registerDomEvent() {} addSettingTab() {} addCommand() {}
+    registerEditorExtension(extension) { this.extension = extension; this._events.push(() => { this.extension = null; }); }
+    // Exact cleanup order confirmed from both live Obsidian Component implementations.
+    unload() { if (!this._loaded) return; this._loaded = false; let { _children: children, _events: events } = this;
+      while (children.length > 0) children.pop().unload();
+      while (events.length > 0) events.pop()();
+      this.onunload(); }
     addStatusBarItem() { return new Element(); }
   }
   const obs = { Plugin, PluginSettingTab: Empty, ItemView: Empty, Modal: Empty, SuggestModal: Empty, FuzzySuggestModal: Empty, Notice: Empty,
