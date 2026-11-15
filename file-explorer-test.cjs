@@ -4,21 +4,25 @@ const path = require('node:path');
 const vm = require('node:vm');
 const assert = require('node:assert/strict');
 const { test } = require('node:test');
-function fixture({ attachments = 0 } = {}) {
+function fixture({ attachments = 0, rootFolderIcons = {} } = {}) {
   const metrics = { extensionReads: 0, comparisons: 0, renders: 0, highlightCalls: 0 };
   class Element {
     constructor(options = {}) { this.children = []; this.attrs = { ...options.attr }; this.classes = new Set((options.cls || '').split(' ').filter(Boolean)); this.events = {}; this.style = {}; this.scrollTop = 0; this.text = options.text || ''; }
-    createEl(_, options) { const node = new Element(options); this.children.push(node); return node; }
+    createEl(_, options) { const node = new Element(options); node.parentElement = this; this.children.push(node); return node; }
     createSpan(options) { return this.createEl('span', options); }
     createDiv(options) { return this.createEl('div', options); }
     addClass(...names) { names.forEach(name => this.classes.add(name)); }
     removeClass(...names) { names.forEach(name => this.classes.delete(name)); }
     toggleClass(name, enabled) { if (enabled) this.classes.add(name); else this.classes.delete(name); }
     setAttribute(name, value) { this.attrs[name] = value; }
+    getAttribute(name) { return this.attrs[name] ?? null; }
+    get textContent() { return this.text; }
+    set textContent(value) { this.text = String(value); }
+    appendChild(node) { if (node.parentElement) { const index = node.parentElement.children.indexOf(node); if (index !== -1) node.parentElement.children.splice(index, 1); } node.parentElement = this; this.children.push(node); return node; }
     addEventListener(name, callback) { this.events[name] = callback; }
     empty() { this.children = []; this.scrollTop = 0; }
     querySelectorAll(selector) {
-      const classes = [...selector.matchAll(/\.([\w-]+)/g)].map(match => match[1]);
+      const classes = [...selector.replace(/\[[^\]]*\]/g, '').matchAll(/\.([\w-]+)/g)].map(match => match[1]);
       const data = selector.match(/\[data-path="([^"]+)"\]/);
       const result = [];
       const visit = node => { for (const child of node.children) { if (classes.every(name => child.classes.has(name)) && (!data || child.attrs['data-path'] === data[1])) result.push(child); visit(child); } };
@@ -33,6 +37,7 @@ function fixture({ attachments = 0 } = {}) {
     get extension() { metrics.extensionReads++; return this.name.split('.').pop(); }
   }
   const timers = new Map(), frames = new Map(); let nextFrame = 1;
+  const listeners = {};
   const vaultEvents = {}, workspaceEvents = {};
   const root = new TFolder('/');
   for (let i = 0; i < 95; i++) { const folder = new TFolder('Folder' + String(i).padStart(2, '0'), root); root.children.push(folder); for (let j = 0; j < 100; j++) folder.children.push(new TFile(folder.path + '/note' + j + '.md', folder)); }
@@ -44,13 +49,13 @@ function fixture({ attachments = 0 } = {}) {
   const context = { require: () => obs, module: { exports: {} }, console, Date, URL, CSS: { escape: value => value }, Intl: { Collator: class { compare(a, b) { metrics.comparisons++; return collator.compare(a, b); } } }, window: { requestAnimationFrame: callback => { const id = nextFrame++; frames.set(id, callback); return id; }, cancelAnimationFrame: id => frames.delete(id) } };
   const main = process.env.TOOLKIT_MAIN || path.join(__dirname, 'main.js');
   vm.runInNewContext(fs.readFileSync(main, 'utf8') + '\nmodule.exports.__Explorer = LuckyFileExplorer;', context);
-  const view = new context.module.exports.__Explorer({}, { _noteCountCache: new Map() });
+  const view = new context.module.exports.__Explorer({}, { _noteCountCache: new Map(), settings: { rootFolderIcons } });
   let active = null;
-  view.app = { vault: { getRoot: () => root, on: (event, callback) => { vaultEvents[event] = callback; return {}; } }, workspace: { getActiveFile: () => active, on: (event, callback) => { workspaceEvents[event] = callback; return {}; } } };
+  view.app = { vault: { getRoot: () => root, on: (event, callback) => { vaultEvents[event] = callback; (listeners[event] ??= []).push(callback); return {}; } }, workspace: { getActiveFile: () => active, on: (event, callback) => { workspaceEvents[event] = callback; return {}; } } };
   const render = view.renderTree.bind(view); view.renderTree = () => { metrics.renders++; return render(); };
   const highlight = view.highlightActiveFile.bind(view); view.highlightActiveFile = () => { metrics.highlightCalls++; return highlight(); };
   const reset = () => Object.keys(metrics).forEach(key => { metrics[key] = 0; });
-  return { view, root, TFile, TFolder, metrics, reset, vaultEvents, workspaceEvents, frames, flush: () => { const values = [...timers.values()]; timers.clear(); values.forEach(fn => fn()); }, flushFrames: () => { const values = [...frames.values()]; frames.clear(); values.forEach(fn => fn()); }, setActive: value => { active = value; } };
+  return { Element, Plugin: context.module.exports, listeners, emit: (event, ...args) => (listeners[event] || []).forEach(fn => fn(...args)), view, root, TFile, TFolder, metrics, reset, vaultEvents, workspaceEvents, frames, flush: () => { const values = [...timers.values()]; timers.clear(); values.forEach(fn => fn()); }, flushFrames: () => { const values = [...frames.values()]; frames.clear(); values.forEach(fn => fn()); }, setActive: value => { active = value; } };
 }
 test('9500-note counts only rescan the changed branch after a Markdown create', async () => {
   const f = fixture(); await f.view.onOpen(); f.reset();
@@ -127,4 +132,174 @@ test('attachments and hidden children are filtered before sorting', async () => 
   await f.view.onOpen();
   console.log('Root sort comparisons with 95 folders and 2000 attachments:', f.metrics.comparisons);
   assert.ok(f.metrics.comparisons < 200); assert.equal(f.view._treeEl.children.length, 95);
+});
+
+function countNodes(node) { return 1 + node.children.reduce((sum, child) => sum + countNodes(child), 0); }
+function nativeCounts(f) {
+  const plugin = new f.Plugin();
+  plugin.app = f.view.app;
+  plugin.settings = { showNoteCount: true };
+  plugin._noteCountCache = new Map();
+  plugin.registerEvent = () => {};
+  f.view.plugin = plugin;
+  const metrics = { enumerations: 0 };
+  const items = {};
+  for (const folder of f.root.children) {
+    if (!(folder instanceof f.TFolder)) continue;
+    const title = new f.Element(); title.createDiv({ cls: 'nav-folder-title-content' });
+    items[folder.path] = { file: folder, selfEl: title };
+    for (const file of folder.children) items[file.path] = { file, selfEl: new f.Element() };
+  }
+  const view = { fileItems: new Proxy(items, { ownKeys(target) { metrics.enumerations++; return Reflect.ownKeys(target); } }) };
+  plugin.app.workspace.getLeavesOfType = type => type === 'file-explorer' ? [{ view }] : [];
+  return { plugin, metrics, items, badge: path => items[path]?.selfEl.querySelector('.lucky-note-count')?.textContent };
+}
+test('selector fixture matches data-path containing a Markdown suffix', () => {
+  const f = fixture(); const el = new f.Element();
+  const row = el.createDiv({ cls: 'lucky-fe-file', attr: { 'data-path': 'Folder00/note0.md' } });
+  assert.equal(el.querySelector('.lucky-fe-file[data-path="Folder00/note0.md"]'), row);
+});
+test('native and custom counts share cache and skip attachment event batches', async () => {
+  const f = fixture(), n = nativeCounts(f); await f.view.onOpen();
+  const afterCustom = f.metrics.extensionReads; n.plugin.initNoteCount();
+  assert.equal(f.metrics.extensionReads, afterCustom, 'native counts must reuse custom counts');
+  f.reset(); n.metrics.enumerations = 0;
+  const image = new f.TFile('image.png', f.root);
+  f.emit('create', image); f.emit('delete', image); f.emit('rename', image, 'old.png'); f.flush();
+  assert.equal(f.metrics.renders, 0); assert.equal(n.metrics.enumerations, 0);
+  assert.ok(f.metrics.extensionReads < 10, 'attachments must not rescan all Markdown');
+  assert.equal(n.badge('Folder00'), '100');
+  console.log('Attachment batch count checks / native enumerations:', f.metrics.extensionReads, n.metrics.enumerations);
+});
+test('native Markdown counts refresh only changed ancestor badges without whole fileItems enumeration', async () => {
+  const f = fixture(), n = nativeCounts(f); await f.view.onOpen(); n.plugin.initNoteCount();
+  f.reset(); n.metrics.enumerations = 0;
+  const folder = f.root.children[0], file = new f.TFile(folder.path + '/new.md', folder); folder.children.push(file);
+  f.emit('create', file); f.flush();
+  assert.equal(n.badge('Folder00'), '101'); assert.equal(n.badge('Folder94'), '100');
+  assert.equal(f.metrics.renders, 1); assert.equal(n.metrics.enumerations, 0);
+  assert.ok(f.metrics.extensionReads < 500, 'unrelated cached folders must stay cached');
+  console.log('Native+custom Markdown create checks / native enumerations:', f.metrics.extensionReads, n.metrics.enumerations);
+  folder.children.pop(); file.parent = null; f.emit('delete', file); f.flush();
+  assert.equal(n.badge('Folder00'), '100');
+});
+test('native counts preserve Markdown-to-attachment rename and folder move/delete semantics', async () => {
+  const f = fixture(), n = nativeCounts(f); await f.view.onOpen(); n.plugin.initNoteCount();
+  const folder = f.root.children[0], file = folder.children[0], oldFile = file.path;
+  file.path = folder.path + '/note0.png'; file.name = 'note0.png';
+  f.emit('rename', file, oldFile); f.flush(); assert.equal(n.badge('Folder00'), '99');
+  const oldFolder = folder.path; folder.path = 'Moved'; folder.name = 'Moved';
+  for (const child of folder.children) child.path = 'Moved/' + child.name;
+  n.items.Moved = n.items[oldFolder]; delete n.items[oldFolder];
+  f.emit('rename', folder, oldFolder); f.flush();
+  assert.equal(n.badge('Moved'), '99'); assert.equal(f.view.getMdCount(folder), 99);
+  assert.ok(!n.plugin._noteCountCache.has(oldFolder));
+  f.root.children.shift(); folder.parent = null; delete n.items.Moved;
+  f.emit('delete', folder); f.flush(); assert.equal(f.view.getMdCount(f.root), 9400);
+  assert.equal(n.badge('Folder01'), '100'); assert.ok(!n.plugin._noteCountCache.has('Moved'));
+});
+test('collapsed folders release file DOM and render correctly on every reopening', async () => {
+  const f = fixture(); await f.view.onOpen(); const initial = countNodes(f.view._treeEl);
+  for (const title of f.view._treeEl.querySelectorAll('.lucky-fe-folder-title')) { title.events.click(); title.events.click(); }
+  assert.equal(countNodes(f.view._treeEl), initial); assert.equal(f.view._treeEl.querySelectorAll('.lucky-fe-file').length, 0);
+  console.log('DOM before / after visiting+collapsing all 95 folders:', initial, countNodes(f.view._treeEl));
+  const first = f.view._treeEl.querySelector('.lucky-fe-folder-title'); first.events.click();
+  assert.equal(f.view._treeEl.querySelectorAll('.lucky-fe-file').length, 100);
+  first.events.click(); first.events.click(); assert.equal(f.view._treeEl.querySelectorAll('.lucky-fe-file').length, 100);
+});
+test('collapsing parent preserves nested expansion state and restores its children', async () => {
+  const f = fixture(), parent = f.root.children[0], nested = new f.TFolder('Folder00/nested', parent);
+  parent.children.push(nested); nested.children.push(new f.TFile(nested.path + '/nested.md', nested));
+  await f.view.onOpen(); f.view.expandedFolders.add(parent.path); f.view.expandedFolders.add(nested.path); f.view.renderTree();
+  const first = f.view._treeEl.querySelector('.lucky-fe-folder-title'); first.events.click();
+  assert.equal(f.view._treeEl.querySelectorAll('.lucky-fe-file').length, 0); assert.ok(f.view.expandedFolders.has(nested.path));
+  first.events.click(); assert.equal(f.view._treeEl.querySelectorAll('.lucky-fe-file').length, 101);
+});
+test('auto-reveal expands ancestors even if an existing row was rendered while ancestor is marked collapsed', async () => {
+  const f = fixture(); await f.view.onOpen(); f.view.expandedFolders.add('Folder00'); f.view.renderTree();
+  f.view.expandedFolders.delete('Folder00'); f.view._treeEl.querySelector('.lucky-fe-children').style.display = 'none';
+  f.view._autoReveal = true; f.setActive(f.root.children[0].children[0]); f.workspaceEvents['file-open'](); f.flushFrames();
+  assert.ok(f.view.expandedFolders.has('Folder00')); assert.ok(f.view._treeEl.querySelector('.lucky-fe-file.is-active'));
+});
+test('visible Markdown modify updates size and tooltip without rebuilding or recounting the tree', async () => {
+  const f = fixture(); await f.view.onOpen(); f.view.expandedFolders.add('Folder00'); f.view.renderTree();
+  const file = f.root.children[0].children[0]; file.stat.size = 8192; file.stat.mtime = 300; f.reset();
+  f.emit('modify', file); f.flushFrames();
+  const row = f.view._treeEl.querySelector('.lucky-fe-file[data-path="Folder00/note0.md"]');
+  assert.equal(row.querySelector('.lucky-fe-file-size').textContent, '8.0K'); assert.match(row.getAttribute('title'), /8\.0 KB/);
+  assert.equal(f.metrics.renders, 0); assert.ok(f.metrics.extensionReads < 10);
+});
+test('modified-time sorting batches changes in one frame and reorders only existing siblings', async () => {
+  const f = fixture(); await f.view.onOpen(); f.view.expandedFolders.add('Folder00'); f.view._sortMode = 'byModifiedTime';
+  const folder = f.root.children[0], a = folder.children[0], b = folder.children[1]; a.stat.mtime = 100; b.stat.mtime = 200;
+  f.view.renderTree(); f.view._treeEl.scrollTop = 240; f.reset(); a.stat.mtime = 300; a.stat.size = 8192;
+  for (let i = 0; i < 100; i++) f.emit('modify', a);
+  assert.equal(f.frames.size, 1); f.flushFrames();
+  assert.equal(f.view._treeEl.querySelector('.lucky-fe-file-name').text, 'note0');
+  assert.equal(f.view._treeEl.scrollTop, 240); assert.equal(f.metrics.renders, 0);
+  assert.ok(f.metrics.extensionReads <= 100); assert.equal(f.frames.size, 0);
+});
+test('modifying hidden files queues no tree work and closing cancels visible modify work', async () => {
+  const f = fixture(); await f.view.onOpen(); const file = f.root.children[0].children[0];
+  f.emit('modify', file); assert.equal(f.frames.size, 0);
+  f.view.expandedFolders.add('Folder00'); f.view.renderTree(); f.emit('modify', file); assert.equal(f.frames.size, 1);
+  await f.view.onClose(); assert.equal(f.frames.size, 0); f.flushFrames();
+});
+
+test('native-only counts handle create/delete/move while disabled and after re-enabling', () => {
+  const f = fixture(), n = nativeCounts(f); n.plugin.initNoteCount(); f.reset(); n.metrics.enumerations = 0;
+  const source = f.root.children[0], target = f.root.children[1], file = source.children.pop(), oldPath = file.path;
+  file.path = target.path + '/' + file.name; file.parent = target; target.children.push(file);
+  f.emit('rename', file, oldPath); f.flush();
+  assert.equal(n.badge('Folder00'), '99'); assert.equal(n.badge('Folder01'), '101'); assert.equal(n.metrics.enumerations, 0);
+  assert.ok(f.metrics.extensionReads < 250);
+  n.plugin.settings.showNoteCount = false; target.children.pop(); file.parent = null; f.emit('delete', file); f.flush();
+  n.plugin.settings.showNoteCount = true; n.plugin.initNoteCount(); assert.equal(n.badge('Folder01'), '100');
+  assert.equal(f.listeners.create.length, 1, 're-enable must not duplicate native listeners');
+});
+test('a newly opened native view gets initial badges before future updates stay incremental', async () => {
+  const f = fixture(), n = nativeCounts(f); await f.view.onOpen(); n.plugin.initNoteCount();
+  const replacementItems = {};
+  for (const [path, item] of Object.entries(n.items)) {
+    if (!(item.file instanceof f.TFolder)) continue;
+    const title = new f.Element(); title.createDiv({ cls: 'nav-folder-title-content' }); replacementItems[path] = { file: item.file, selfEl: title };
+  }
+  const replacementView = { fileItems: replacementItems };
+  f.view.app.workspace.getLeavesOfType = () => [{ view: replacementView }];
+  const folder = f.root.children[0], file = new f.TFile(folder.path + '/new.md', folder); folder.children.push(file);
+  f.reset(); f.emit('create', file); f.flush();
+  assert.equal(replacementItems.Folder00.selfEl.querySelector('.lucky-note-count').textContent, '101');
+  assert.equal(replacementItems.Folder94.selfEl.querySelector('.lucky-note-count').textContent, '100');
+  assert.ok(f.metrics.extensionReads < 500, 'new native view must still reuse shared cache');
+});
+
+test('disabled native badges still invalidate shared counts while the custom view is closed', async () => {
+  const f = fixture(), plugin = new f.Plugin(), layoutCallbacks = [];
+  plugin.app = f.view.app;
+  plugin.loadSettings = async () => { plugin.settings = { showNoteCount: false, showCalendar: false, showFileExplorer: false, enableTagWrangler: false, focusMode: false }; };
+  plugin.applyHiderClasses = () => {}; plugin.registerEvent = () => {}; plugin.addCommand = () => {};
+  plugin.registerView = () => {}; plugin.addSettingTab = () => {}; plugin.addStatusBarItem = () => new f.Element(); plugin.updateReadingTime = () => {};
+  plugin.app.workspace.onLayoutReady = callback => layoutCallbacks.push(callback);
+  let nativeLookups = 0; plugin.app.workspace.getLeavesOfType = () => { nativeLookups++; return []; };
+  await plugin.onload(); layoutCallbacks.forEach(callback => callback());
+  const pluginCreateListeners = [...(f.listeners.create || [])];
+  f.view.plugin = plugin; await f.view.onOpen(); const folder = f.root.children[0];
+  assert.equal(f.view.getMdCount(folder), 100); await f.view.onClose();
+  const file = new f.TFile(folder.path + '/while-closed.md', folder); folder.children.push(file);
+  // Obsidian removes the closed ItemView's events; only plugin-owned listeners remain.
+  pluginCreateListeners.forEach(callback => callback(file)); f.flush();
+  const reopened = new f.view.constructor({}, plugin); reopened.app = plugin.app; await reopened.onOpen();
+  assert.equal(reopened.getMdCount(folder), 101);
+  assert.equal(reopened._treeEl.querySelector('.lucky-fe-count').textContent, '101');
+  assert.equal(nativeLookups, 0, 'disabled native badges must not inspect or render native DOM');
+  assert.equal(pluginCreateListeners.length, 1, 'one plugin listener owns shared cache invalidation across view lifetimes');
+});
+
+test('per-device icons stay in settings without changing shared code', () => {
+  const f = fixture({ rootFolderIcons: { '04-Learning': 'graduation-cap', Invalid: false } });
+  assert.equal(f.view.folderIcons['04-Learning'], 'graduation-cap');
+  assert.equal(f.view.folderIcons['01-Work'], 'rocket');
+  assert.equal(f.view.folderIcons.Invalid, undefined);
+  assert.equal(Object.getPrototypeOf(f.view.folderIcons), null);
+  assert.equal(f.view.folderIcons.constructor, undefined);
 });

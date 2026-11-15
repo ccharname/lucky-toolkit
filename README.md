@@ -4,7 +4,7 @@
 
 个人整合的 Obsidian 插件，把十多个常用小功能合并到单个插件里，便于一处管理。
 
-- **Version**: 4.0.7
+- **Version**: 4.0.9
 - **Min Obsidian Version**: 1.5.8
 - **Author**: zheng
 - **Platform**: Desktop & Mobile
@@ -93,4 +93,14 @@ node --test test-behavior.cjs file-explorer-test.cjs
 
 ```bash
 node --test test-behavior.cjs
+```
+
+## 4.0.9
+
+修复异步标题操作在停用后继续请求或改正文、占位归属和代码/属性区保护。标题请求跨重载共享两个真实在途名额；无CodeMirror接口时保守保留原URL。
+
+文件树折叠释放子DOM，自动定位展开祖先，修改后更新大小与时间排序；原生及自建文件树共享按目录失效的计数缓存，附件事件跳过全库计数。整合此前本地粘贴与界面修复。目录图标可由 `rootFolderIcons` 配置覆盖，安装包统一。
+
+```bash
+node --test file-explorer-test.cjs test-behavior.cjs paste-behavior-test.cjs title-limits.test.cjs network-lifecycle.test.cjs
 ```

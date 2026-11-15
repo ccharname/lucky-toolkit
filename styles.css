@@ -1144,6 +1144,14 @@ body.lucky-hide-vault:not(.is-mobile) .workspace-split.mod-left-split .workspace
   font-size: 13px;
   font-weight: 500;
   letter-spacing: -0.02em;
+  color: var(--text-muted);
+  transition: color 0.12s ease;
+}
+
+/* Muted like the native explorer; hover and the active root return to normal text. */
+.lucky-fe-root-folder:hover .lucky-fe-folder-name,
+.lucky-fe-root-folder.is-active-root .lucky-fe-folder-name {
+  color: var(--text-normal);
 }
 
 .lucky-fe-root-folder .lucky-fe-icon {
@@ -1231,6 +1239,15 @@ body.lucky-hide-vault:not(.is-mobile) .workspace-split.mod-left-split .workspace
 }
 
 .lucky-fe-folder-title:hover .lucky-fe-count {
+  opacity: 1;
+}
+
+/* Desktop: counts stay out of sight until hover, like the native explorer. */
+body:not(.is-mobile) .lucky-fe-count {
+  opacity: 0;
+}
+
+body:not(.is-mobile) .lucky-fe-folder-title:hover .lucky-fe-count {
   opacity: 1;
 }
 

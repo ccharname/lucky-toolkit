@@ -4,6 +4,7 @@ const { Plugin, PluginSettingTab, Setting, debounce, Menu, Notice, TFolder, TFil
 const CJK_RE = /[\u4e00-\u9fff]/g;
 const EN_RE = /\S+/g;
 const ZH_COLLATOR = new Intl.Collator('zh-CN');
+const LINK_TITLE_GATES = Symbol.for('lucky-toolkit.link-title-gates.v1');
 
 function tokenHasNonCjkChar(token) {
   for (let i = 0; i < token.length; i++) {
@@ -35,6 +36,34 @@ function countMdInFolder(folder, cache) {
   return count;
 }
 
+// Share branch invalidation between native and custom explorers.
+function invalidateMdCounts(file, oldPath, cache) {
+  const isFolder = file instanceof TFolder;
+  if (!isFolder && !(file instanceof TFile && file.extension === 'md') && !oldPath?.endsWith('.md')) return null;
+  const affected = new Set();
+  for (const path of [file.path, oldPath]) {
+    if (!path) continue;
+    if (isFolder) {
+      affected.add(path);
+      for (const key of cache.keys()) {
+        if (key === path || key.startsWith(path + '/')) {
+          cache.delete(key);
+          affected.add(key);
+          if (oldPath && path === oldPath) affected.add(file.path + key.slice(oldPath.length));
+        }
+      }
+    }
+    let folderPath = path;
+    do {
+      const slash = folderPath.lastIndexOf('/');
+      folderPath = slash === -1 ? '/' : folderPath.slice(0, slash) || '/';
+      cache.delete(folderPath);
+      affected.add(folderPath);
+    } while (folderPath !== '/');
+  }
+  return affected;
+}
+
 // ============================================================
 // Default Settings
 // ============================================================
@@ -63,6 +92,7 @@ const DEFAULT_SETTINGS = {
   focusMode: false,
   // Feature 12: File Explorer
   showFileExplorer: true,
+  rootFolderIcons: {},
 };
 
 // ============================================================
@@ -72,7 +102,9 @@ const DEFAULT_SETTINGS = {
 class LuckyToolkit extends Plugin {
   async onload() {
     console.log('Loading Lucky Toolkit');
+    this._linkTitleUnloaded = false;
     await this.loadSettings();
+    if (this._linkTitleUnloaded) return;
     this._noteCountCache = new Map();
 
     // --- Feature 1: Hider — apply CSS classes based on settings ---
@@ -98,9 +130,7 @@ class LuckyToolkit extends Plugin {
 
     // --- Feature 3: Note Count — badges on folders ---
     this.app.workspace.onLayoutReady(() => {
-      if (this.settings.showNoteCount) {
-        this.initNoteCount();
-      }
+      if (!this._linkTitleUnloaded) this.initNoteCount();
     });
 
     // --- Feature 4: Tag Wrangler — context menu on tag pane ---
@@ -116,12 +146,13 @@ class LuckyToolkit extends Plugin {
       callback: () => this.activateCalendarView(),
     });
     this.app.workspace.onLayoutReady(() => {
-      if (this.settings.showCalendar) {
+      if (!this._linkTitleUnloaded && this.settings.showCalendar) {
         this.activateCalendarView();
       }
     });
 
     // --- Feature 6: Auto Link Title ---
+    this.initLinkTitleTracking();
     this.registerEvent(
       this.app.workspace.on('editor-paste', (evt, editor) => {
         if (!this.settings.autoLinkTitle) return;
@@ -144,7 +175,7 @@ class LuckyToolkit extends Plugin {
     this.registerEvent(
       this.app.workspace.on('editor-change', debounce(() => { this._readingTimeDirty = true; this.updateReadingTime(); }, 800, true))
     );
-    this.app.workspace.onLayoutReady(() => this.updateReadingTime());
+    this.app.workspace.onLayoutReady(() => { if (!this._linkTitleUnloaded) this.updateReadingTime(); });
 
     // --- Feature 8: Focus Mode ---
     if (this.settings.focusMode) {
@@ -169,7 +200,7 @@ class LuckyToolkit extends Plugin {
       callback: () => this.activateFileExplorer(),
     });
     this.app.workspace.onLayoutReady(() => {
-      if (this.settings.showFileExplorer) {
+      if (!this._linkTitleUnloaded && this.settings.showFileExplorer) {
         this.activateFileExplorer();
       }
     });
@@ -191,9 +222,25 @@ class LuckyToolkit extends Plugin {
 
   onunload() {
     console.log('Unloading Lucky Toolkit');
+    this._linkTitleUnloaded = true;
+    for (const operation of this._linkTitleOperations || []) {
+      this.replaceLinkTitleOperation(operation, operation.url, true);
+      operation.cancelled = true;
+      globalThis.clearTimeout?.(operation.timeoutId);
+      operation.cancelWait?.();
+      operation.editor = null;
+      operation.view = null;
+      operation.doc = null;
+      operation.snapshot = null;
+      operation.ownerView = null;
+      operation.file = null;
+    }
+    this._linkTitleOperations?.clear();
     // Remove hider classes
     document.body.removeClass('lucky-hide-scroll', 'lucky-hide-meta', 'lucky-hide-vault', 'lucky-beautify');
     // Remove note count badges
+    this._refreshNoteCounts?.cancel();
+    this._pendingNoteCountPaths?.clear();
     this.removeAllNoteCounts();
     // Detach calendar view
     this.app.workspace.detachLeavesOfType(CALENDAR_VIEW_TYPE);
@@ -300,15 +347,21 @@ class LuckyToolkit extends Plugin {
     if (this._noteCountInited) return;
     this._noteCountInited = true;
 
-    // Debounced refresh on vault changes
-    const debouncedRefresh = debounce(() => {
-      this._noteCountCache.clear();
-      this.updateAllNoteCounts();
+    this._pendingNoteCountPaths = new Set();
+    this._refreshNoteCounts = debounce(() => {
+      const paths = [...this._pendingNoteCountPaths];
+      this._pendingNoteCountPaths.clear();
+      this.updateAllNoteCounts(paths);
     }, 1000, true);
-
-    this.registerEvent(this.app.vault.on('create', debouncedRefresh));
-    this.registerEvent(this.app.vault.on('delete', debouncedRefresh));
-    this.registerEvent(this.app.vault.on('rename', debouncedRefresh));
+    const onChange = (file, oldPath) => {
+      const paths = invalidateMdCounts(file, oldPath, this._noteCountCache);
+      if (!paths) return;
+      for (const path of paths) this._pendingNoteCountPaths.add(path);
+      this._refreshNoteCounts();
+    };
+    this.registerEvent(this.app.vault.on('create', onChange));
+    this.registerEvent(this.app.vault.on('delete', onChange));
+    this.registerEvent(this.app.vault.on('rename', onChange));
   }
 
   /**
@@ -330,13 +383,17 @@ class LuckyToolkit extends Plugin {
   /**
    * Update note count badges on all folders in the file explorer
    */
-  updateAllNoteCounts() {
+  updateAllNoteCounts(paths) {
     if (!this.settings.showNoteCount) return;
 
     const view = this.getFileExplorerView();
     if (!view || !view.fileItems) return;
 
-    for (const [path, item] of Object.entries(view.fileItems)) {
+    this._countedNativeViews ||= new WeakSet();
+    const knownView = this._countedNativeViews.has(view);
+    this._countedNativeViews.add(view);
+    const items = paths && knownView ? paths.map(path => view.fileItems[path]).filter(Boolean) : Object.values(view.fileItems);
+    for (const item of items) {
       // item.file is a TAbstractFile; only process folders
       if (!(item.file instanceof TFolder)) continue;
 
@@ -593,7 +650,166 @@ class LuckyToolkit extends Plugin {
   // Feature 6: Auto Link Title — paste handler
   // ============================================================
 
+  getLinkTitleGate() {
+    let gates = globalThis[LINK_TITLE_GATES];
+    if (!gates) {
+      gates = new WeakMap();
+      Object.defineProperty(globalThis, LINK_TITLE_GATES, { value: gates });
+    }
+    const owner = this.app && typeof this.app === 'object' ? this.app : this;
+    let gate = gates.get(owner);
+    if (!gate) { gate = { active: 0 }; gates.set(owner, gate); }
+    return gate;
+  }
+
+  isLinkTitleOperationActive(operation) {
+    return !this._linkTitleUnloaded && !operation.cancelled && !operation.timedOut && this.settings?.autoLinkTitle !== false;
+  }
+
+  initLinkTitleTracking() {
+    this._linkTitleRangeMapping = false;
+    try {
+      if (typeof this.registerEditorExtension === 'function') {
+        const { EditorView } = require('@codemirror/view');
+        this.registerEditorExtension(EditorView.updateListener.of(update => this.updateLinkTitleRanges(update)));
+        this._linkTitleRangeMapping = true;
+      }
+    } catch (_) { /* Editors without CodeMirror use a conservative original-URL fallback. */ }
+    this.registerEvent(this.app.workspace.on('editor-change', (editor) => {
+      for (const operation of this._linkTitleOperations || []) {
+        if (!operation.view && operation.editor === editor && !operation.replacing) {
+          operation.cancelled = true;
+          operation.cancelWait?.();
+        }
+      }
+    }));
+  }
+
+  updateLinkTitleRanges(update) {
+    if (!update.docChanged) return;
+    // A synchronous owned unload cleanup must also map the other pending ranges.
+    if (this._linkTitleUnloaded && ![...(this._linkTitleOperations || [])].some(operation =>
+      operation.view === update.view && operation.replacing)) return;
+    for (const operation of this._linkTitleOperations || []) {
+      if (operation.view !== update.view || operation.replacing || operation.cancelled) continue;
+      if (update.startState && operation.doc !== update.startState.doc) {
+        operation.cancelled = true;
+        operation.cancelWait?.();
+        continue;
+      }
+      let touched = false;
+      update.changes.iterChangedRanges((from, to) => {
+        if ((from < operation.toOffset && to > operation.fromOffset) ||
+            (from === to && from > operation.fromOffset && from < operation.toOffset)) touched = true;
+      });
+      if (touched) {
+        operation.cancelled = true;
+        operation.cancelWait?.();
+        continue;
+      }
+      operation.fromOffset = update.changes.mapPos(operation.fromOffset, 1);
+      operation.toOffset = update.changes.mapPos(operation.toOffset, -1);
+      operation.doc = update.state.doc;
+    }
+  }
+
+  replaceLinkTitleOperation(operation, replacement, allowUnloading = false) {
+    if (operation.cancelled || !operation.editor || (this._linkTitleUnloaded && !allowUnloading)) return false;
+    const editor = operation.editor;
+    try {
+      if (operation.file && (operation.ownerView ? operation.ownerView.file !== operation.file :
+          this.app.workspace.getActiveFile?.() !== operation.file)) return false;
+      if (operation.view) {
+        if (operation.view.state.doc !== operation.doc) return false;
+      } else {
+        if (editor.getValue() !== operation.snapshot) return false;
+      }
+      const from = editor.offsetToPos(operation.fromOffset);
+      const to = editor.offsetToPos(operation.toOffset);
+      if (editor.getRange(from, to) !== operation.placeholder) return false;
+      operation.replacing = true;
+      if (replacement !== operation.placeholder) editor.replaceRange(replacement, from, to);
+      return true;
+    } catch (_) { return false; }
+    finally { operation.replacing = false; }
+  }
+
+  isSmallHtmlResponse(response, requireLength = true) {
+    if (!response || !(response.status >= 200 && response.status < 300)) return false;
+    const headers = Object.fromEntries(Object.entries(response.headers || {}).map(([key, value]) => [key.toLowerCase(), value]));
+    const type = String(headers['content-type'] || '').split(';')[0].trim().toLowerCase();
+    if (type !== 'text/html' && type !== 'application/xhtml+xml') return false;
+    const length = String(headers['content-length'] || '').trim();
+    if (requireLength && !/^\d+$/.test(length)) return false;
+    if (length && (!/^\d+$/.test(length) || Number(length) > 512 * 1024)) return false;
+    return !response.arrayBuffer || response.arrayBuffer.byteLength <= 512 * 1024;
+  }
+
+  async fetchLinkTitleResponse(url, operation) {
+    const gate = this.getLinkTitleGate();
+    if (gate.active >= 2 || !this.isLinkTitleOperationActive(operation)) return null;
+    gate.active++;
+    this._linkTitleRequests = (this._linkTitleRequests || 0) + 1;
+    const headers = {
+      'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36',
+      'Accept': 'text/html,application/xhtml+xml',
+      'Accept-Encoding': 'identity',
+    };
+    try {
+      const head = await requestUrl({ url, method: 'HEAD', headers, throw: false });
+      if (!this.isLinkTitleOperationActive(operation) || !this.isSmallHtmlResponse(head)) return null;
+      const response = await requestUrl({ url, method: 'GET', headers: { ...headers, 'Range': 'bytes=0-524287' }, throw: false });
+      if (!this.isLinkTitleOperationActive(operation) || !this.isSmallHtmlResponse(response)) return null;
+      return response;
+    } finally {
+      this._linkTitleRequests--;
+      gate.active--;
+    }
+  }
+
+  isCodePosition(editor, cursor) {
+    let fence = null;
+    let delimiter = null;
+    let frontmatter = /^\uFEFF?---\s*$/.test(editor.getLine(0));
+    for (let line = 0; line <= cursor.line; line++) {
+      const text = editor.getLine(line);
+      if (frontmatter) {
+        if (line === cursor.line) return true;
+        if (line > 0 && /^(?:---|\.\.\.)\s*$/.test(text)) frontmatter = false;
+        continue;
+      }
+      const unquoted = text.replace(/^(?: {0,3}>[ \t]?)+/, '');
+      const match = unquoted.match(/^[ \t]*(?:(?:[-+*]|\d+[.)])[ \t]+)?(`{3,}|~{3,})(.*)$/);
+      if (match) {
+        delimiter = null;
+        const marker = match[1];
+        if (fence) {
+          if (marker[0] === fence[0] && marker.length >= fence.length && /^\s*$/.test(match[2])) fence = null;
+        } else if (marker[0] !== '`' || !match[2].includes('`')) {
+          fence = marker;
+        }
+        if (line === cursor.line) return true;
+        continue;
+      }
+      if (fence) { if (line === cursor.line) return true; continue; }
+      if (!delimiter && /^(?: {4}| {0,3}\t)/.test(unquoted)) {
+        if (line === cursor.line) return true;
+        continue;
+      }
+      if (!text.trim()) delimiter = null;
+      const prefix = line === cursor.line ? text.slice(0, cursor.ch) : text;
+      for (const token of prefix.matchAll(/(\\*)(`+)/g)) {
+        if (token[1].length % 2 && !delimiter) continue;
+        if (!delimiter) delimiter = token[2];
+        else if (token[2] === delimiter) delimiter = null;
+      }
+      if (line === cursor.line) return delimiter !== null;
+    }
+    return false;
+  }
+
   async handlePaste(evt, editor) {
+    if (this._linkTitleUnloaded || evt.defaultPrevented) return;
     const clipboardData = evt.clipboardData;
     if (!clipboardData) return;
     const text = clipboardData.getData('text/plain').trim();
@@ -602,50 +818,42 @@ class LuckyToolkit extends Plugin {
     // Check if it's a URL
     if (!/^https?:\/\/\S+$/.test(text)) return;
 
+    const cursor = editor.getCursor('from');
+    if (this.isCodePosition(editor, cursor)) return;
+    if (this.getLinkTitleGate().active >= 2) return;
+    try {
+      if (/\.(?:7z|avi|bin|bmp|bz2|docx?|dmg|exe|flac|gif|gz|heic|ico|jpe?g|m4a|mkv|mov|mp3|mp4|ogg|pdf|png|pptx?|rar|tar|tgz|tiff?|wav|webm|webp|woff2?|xlsx?|xz|zip)$/i.test(new URL(text).pathname)) return;
+    } catch (_) { return; }
+
     // Prevent default paste
     evt.preventDefault();
 
     // Insert loading placeholder. getCursor('from') = selection START — with an
     // active selection, plain getCursor() returns the head (possibly the end),
     // which is not where replaceSelection() inserts.
-    const cursor = editor.getCursor('from');
-    const placeholder = '[获取标题中…](' + text + ')';
+    const candidateView = this._linkTitleRangeMapping && editor.cm;
+    const view = candidateView?.state?.doc && typeof candidateView.dispatch === 'function' ? candidateView : null;
+    const placeholder = view ? '[获取标题中…](' + text + ')' : text;
+    const fromOffset = typeof editor.posToOffset === 'function' ? editor.posToOffset(cursor) :
+      editor.getValue().split('\n').slice(0, cursor.line).reduce((length, line) => length + line.length + 1, 0) + cursor.ch;
     editor.replaceSelection(placeholder);
-    const from = cursor;
-    const to = { line: cursor.line, ch: cursor.ch + placeholder.length };
-    // Replace the placeholder wherever it now lives: fast path via saved coords,
-    // text-search fallback when user edits shifted them during the fetch.
-    const replacePlaceholder = (replacement) => {
-      try {
-        if (editor.getRange(from, to) === placeholder) {
-          editor.replaceRange(replacement, from, to);
-          return;
-        }
-      } catch (_) { /* stale coords — fall through */ }
-      const idx = editor.getValue().indexOf(placeholder);
-      if (idx === -1) return; // user removed the placeholder — nothing to do
-      editor.replaceRange(replacement, editor.offsetToPos(idx), editor.offsetToPos(idx + placeholder.length));
-    };
-
-    // Fetch title with 5s timeout, via Obsidian's requestUrl to bypass CORS.
-    // Send a browser-like UA + explicit Accept-Encoding so sites like Bilibili
-    // serve the normal HTML page; decompress manually because requestUrl().text
-    // doesn't reliably auto-decompress gzip/brotli responses.
-    const fetchTitle = requestUrl({
-      url: text,
-      method: 'GET',
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36',
-        'Accept': 'text/html,application/xhtml+xml,*/*;q=0.8',
-        'Accept-Encoding': 'gzip, deflate',
-      },
-      throw: false,
+    const ownerView = (this.app?.workspace?.getLeavesOfType?.('markdown') || []).find(leaf => leaf.view?.editor === editor)?.view;
+    const operation = { id: Symbol('link-title'), url: text, editor, view, doc: view?.state.doc,
+      placeholder, fromOffset, toOffset: fromOffset + placeholder.length,
+      snapshot: view ? null : editor.getValue(), ownerView,
+      file: ownerView?.file || this.app?.workspace?.getActiveFile?.(), timedOut: false, cancelled: false };
+    (this._linkTitleOperations || (this._linkTitleOperations = new Set())).add(operation);
+    const replacePlaceholder = replacement => this.replaceLinkTitleOperation(operation, replacement);
+    const fetchTitle = this.fetchLinkTitleResponse(text, operation);
+    const timeout = new Promise((resolve, reject) => {
+      operation.cancelWait = () => resolve(null);
+      operation.timeoutId = setTimeout(() => { operation.timedOut = true; reject(new Error('timeout')); }, 5000);
     });
-    const timeout = new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 5000));
-
     try {
       const response = await Promise.race([fetchTitle, timeout]);
+      if (!this.isLinkTitleOperationActive(operation)) { replacePlaceholder(text); return; }
       const html = this.decodeResponseBody(response);
+      if (html.length > 512 * 1024) { replacePlaceholder(text); return; }
       let title = '';
       const ogMatch = html.match(/<meta[^>]+(?:property|name)=["']og:title["'][^>]+content=["']([^"']+)["']/i)
         || html.match(/<meta[^>]+content=["']([^"']+)["'][^>]+(?:property|name)=["']og:title["']/i);
@@ -665,6 +873,16 @@ class LuckyToolkit extends Plugin {
     } catch (e) {
       replacePlaceholder(text);
       console.log('Lucky Toolkit: 获取标题失败', text, e);
+    } finally {
+      globalThis.clearTimeout?.(operation.timeoutId);
+      this._linkTitleOperations.delete(operation);
+      operation.editor = null;
+      operation.view = null;
+      operation.doc = null;
+      operation.snapshot = null;
+      operation.ownerView = null;
+      operation.file = null;
+      operation.cancelWait = null;
     }
   }
 
@@ -699,23 +917,24 @@ class LuckyToolkit extends Plugin {
     const headers = response.headers || {};
     const enc = String(headers['content-encoding'] || headers['Content-Encoding'] || '').toLowerCase();
     const ab = response.arrayBuffer;
+    if (ab && ab.byteLength > 512 * 1024) return '';
     if (ab) {
       try {
         const zlib = require('zlib');
         const buf = Buffer.from(ab);
         const isGzipMagic = buf.length >= 2 && buf[0] === 0x1f && buf[1] === 0x8b;
-        if (enc.includes('br')) return zlib.brotliDecompressSync(buf).toString('utf-8');
-        if (enc.includes('gzip') || isGzipMagic) return zlib.gunzipSync(buf).toString('utf-8');
+        if (enc.includes('br')) return zlib.brotliDecompressSync(buf, { maxOutputLength: 512 * 1024 }).toString('utf-8');
+        if (enc.includes('gzip') || isGzipMagic) return zlib.gunzipSync(buf, { maxOutputLength: 512 * 1024 }).toString('utf-8');
         if (enc.includes('deflate')) {
-          try { return zlib.inflateSync(buf).toString('utf-8'); }
-          catch (_) { return zlib.inflateRawSync(buf).toString('utf-8'); }
+          try { return zlib.inflateSync(buf, { maxOutputLength: 512 * 1024 }).toString('utf-8'); }
+          catch (_) { return zlib.inflateRawSync(buf, { maxOutputLength: 512 * 1024 }).toString('utf-8'); }
         }
         return buf.toString('utf-8');
       } catch (_) {
         // fall through to .text
       }
     }
-    return typeof response.text === 'string' ? response.text : '';
+    return typeof response.text === 'string' && response.text.length <= 512 * 1024 ? response.text : '';
   }
 
   decodeHtmlEntities(s) {
@@ -1064,17 +1283,17 @@ class LuckyFileExplorer extends ItemView {
     this.plugin = plugin;
     this.expandedFolders = new Set(['/']); // root always expanded
     // Folder icon mapping (Lucide icon names from obsidian-icon-folder)
-    this.folderIcons = {
+    this.folderIcons = Object.assign(Object.create(null), {
       '00-Inbox': 'inbox',
       '01-Work': 'rocket',
       '02-Finance': 'trending-up',
       '03-Fitness': 'heart',
-      '04-Learning': 'graduation-cap',
+      '04-Learning': 'book-marked',
       '10-Journal': 'pen-line',
       '40-Resources': 'bookmark',
       '50-Archives': 'package',
       '99-System': 'cpu',
-    };
+    }, Object.fromEntries(Object.entries(plugin.settings?.rootFolderIcons || {}).filter(([, value]) => typeof value === 'string')));
   }
 
   getViewType() { return FILE_EXPLORER_VIEW_TYPE; }
@@ -1085,7 +1304,9 @@ class LuckyFileExplorer extends ItemView {
     this._sortMode = this._sortMode || 'alphabetical';
     this._autoReveal = this._autoReveal || false;
     this._allExpanded = false;
-    this._mdCountCache = new Map(); // cleared on vault change
+    this._mdCountCache = this.plugin._noteCountCache;
+    this._fileRows = new Map();
+    this._pendingModifiedFiles = new Set();
 
     const container = this.containerEl.children[1];
     container.addClass('lucky-fe-container');
@@ -1188,23 +1409,7 @@ class LuckyFileExplorer extends ItemView {
     }, 500, true);
     this._refreshTree = refresh;
     const onTreeChange = (file, oldPath) => {
-      if (!(file instanceof TFolder) && !(file instanceof TFile && file.extension === 'md') && !oldPath?.endsWith('.md')) return;
-      if (file instanceof TFolder) {
-        // A moved/deleted folder can invalidate descendant cache keys as well.
-        this._mdCountCache.clear();
-        this.plugin._noteCountCache.clear();
-      } else {
-        for (const path of [file.path, oldPath]) {
-          if (!path) continue;
-          let folderPath = path;
-          do {
-            const slash = folderPath.lastIndexOf('/');
-            folderPath = slash === -1 ? '/' : folderPath.slice(0, slash) || '/';
-            this._mdCountCache.delete(folderPath);
-            this.plugin._noteCountCache.delete(folderPath);
-          } while (folderPath !== '/');
-        }
-      }
+      if (!invalidateMdCounts(file, oldPath, this._mdCountCache)) return;
       refresh();
     };
     this.registerEvent(this.app.vault.on('create', onTreeChange));
@@ -1220,6 +1425,34 @@ class LuckyFileExplorer extends ItemView {
         }
       }
       onTreeChange(file, oldPath);
+    }));
+    this.registerEvent(this.app.vault.on('modify', (file) => {
+      if (!(file instanceof TFile) || !this._fileRows.has(file.path)) return;
+      this._pendingModifiedFiles.add(file);
+      if (this._modifyFrame != null) return;
+      this._modifyFrame = window.requestAnimationFrame(() => {
+        this._modifyFrame = null;
+        const parents = new Set();
+        for (const changed of this._pendingModifiedFiles) {
+          const row = this._fileRows.get(changed.path)?.el;
+          if (!row || !changed.stat) continue;
+          const size = (changed.stat.size / 1024).toFixed(1);
+          let sizeEl = row.querySelector('.lucky-fe-file-size');
+          if (!sizeEl) sizeEl = row.createEl('span', { cls: 'lucky-fe-file-size' });
+          sizeEl.textContent = size + 'K';
+          row.setAttribute('title', changed.path + '\n' + size + ' KB · ' + new Date(changed.stat.mtime).toLocaleDateString('zh-CN'));
+          if (this._sortMode === 'byModifiedTime' || this._sortMode === 'byModifiedTimeReverse') parents.add(row.parentElement);
+        }
+        this._pendingModifiedFiles.clear();
+        const scrollTop = this._treeEl.scrollTop;
+        for (const parent of parents) {
+          const rows = Array.from(parent.children).map(el => this._fileRows.get(el.getAttribute('data-path'))).filter(Boolean);
+          const direction = this._sortMode === 'byModifiedTime' ? -1 : 1;
+          rows.sort((a, b) => direction * ((a.file.stat?.mtime || 0) - (b.file.stat?.mtime || 0)));
+          for (const row of rows) parent.appendChild(row.el);
+        }
+        this._treeEl.scrollTop = scrollTop;
+      });
     }));
     this.registerEvent(this.app.workspace.on('file-open', () => {
       if (this._fileOpenFrame != null) return;
@@ -1238,6 +1471,10 @@ class LuckyFileExplorer extends ItemView {
     this._refreshTree?.cancel();
     if (this._fileOpenFrame != null) window.cancelAnimationFrame(this._fileOpenFrame);
     this._fileOpenFrame = null;
+    if (this._modifyFrame != null) window.cancelAnimationFrame(this._modifyFrame);
+    this._modifyFrame = null;
+    this._pendingModifiedFiles.clear();
+    this._fileRows.clear();
   }
 
   // Cached md file count — built once per vault change, reused across render
@@ -1249,6 +1486,7 @@ class LuckyFileExplorer extends ItemView {
     const treeEl = this._treeEl;
     const scrollTop = treeEl.scrollTop;
     treeEl.empty();
+    this._fileRows.clear();
     const root = this.app.vault.getRoot();
     this.renderFolder(treeEl, root, 0, true);
     treeEl.scrollTop = scrollTop;
@@ -1325,6 +1563,9 @@ class LuckyFileExplorer extends ItemView {
           const nowExpanded = this.expandedFolders.has(folderPath);
           if (nowExpanded) {
             this.expandedFolders.delete(folderPath);
+            for (const row of childrenEl.querySelectorAll('.lucky-fe-file')) this._fileRows.delete(row.getAttribute('data-path'));
+            childrenEl.empty();
+            childrenRendered = false;
             childrenEl.style.display = 'none';
             arrow.removeClass('is-expanded');
             if (isGenericIcon) setIcon(iconEl, 'folder');
@@ -1374,6 +1615,7 @@ class LuckyFileExplorer extends ItemView {
           cls: 'lucky-fe-file' + (isActive ? ' is-active' : ''),
           attr: { 'data-depth': String(depth), 'data-path': child.path },
         });
+        this._fileRows.set(child.path, { el: fileEl, file: child });
         // Tooltip: full path + size + modified time
         const fileSizeKB = child.stat ? (child.stat.size / 1024).toFixed(1) + ' KB' : '';
         const fileMtime = child.stat ? new Date(child.stat.mtime).toLocaleDateString('zh-CN') : '';
@@ -1430,6 +1672,20 @@ class LuckyFileExplorer extends ItemView {
       container.querySelectorAll('.lucky-fe-root-folder.is-active-root').forEach((el) => el.removeClass('is-active-root'));
       if (!activeFile) return;
 
+      // Reveal ancestors before looking up an existing row: it may be hidden.
+      let expanded = false;
+      if (this._autoReveal) {
+        let parent = activeFile.parent;
+        while (parent && parent.path !== '/') {
+          if (!this.expandedFolders.has(parent.path)) {
+            this.expandedFolders.add(parent.path);
+            expanded = true;
+          }
+          parent = parent.parent;
+        }
+        if (expanded) this.renderTree();
+      }
+
       // Only the root folder that contains the active note keeps its accent icon.
       const slash = activeFile.path.indexOf('/');
       if (slash > 0) {
@@ -1441,23 +1697,7 @@ class LuckyFileExplorer extends ItemView {
 
       if (existing) {
         existing.addClass('is-active');
-        return;
-      }
-
-      // Slow path: ancestor folder not expanded.
-      // Only expand+scroll when user explicitly enabled auto-reveal — otherwise
-      // keep the tree collapsed so that opening the sidebar shows the root layout.
-      if (!this._autoReveal) return;
-
-      let parent = activeFile.parent;
-      while (parent && parent.path !== '/') {
-        this.expandedFolders.add(parent.path);
-        parent = parent.parent;
-      }
-      this.renderTree();
-      const newEl = container.querySelector(`.lucky-fe-file[data-path="${escaped}"]`);
-      if (newEl) {
-        newEl.scrollIntoView({ block: 'nearest' });
+        if (expanded) existing.scrollIntoView({ block: 'nearest' });
       }
     } finally {
       this._highlighting = false;
