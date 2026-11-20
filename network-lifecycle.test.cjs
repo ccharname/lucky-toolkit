@@ -212,4 +212,145 @@ test('missing CodeMirror support preserves original URLs after edits', async () 
   assert.equal(ed.getValue(), 'Prefix https://example.com/page');
 });
 
+function sidebarFixture() {
+  const f = fixture();
+  const detached = [], leftCalls = [], rightCalls = [], revealed = [];
+  const leftSplit = { children: [{ id: 'group-1' }] };
+  const leavesByType = { 'lucky-calendar': [], 'lucky-files': [] };
+  const makeLeaf = () => ({
+    viewState: null,
+    getRoot: () => leftSplit,
+    async setViewState(vs) { this.viewState = vs; },
+  });
+  Object.assign(f.app.workspace, {
+    leftSplit,
+    detachLeavesOfType: type => detached.push(type),
+    getLeavesOfType: type => leavesByType[type] || [],
+    getLeftLeaf: split => { leftCalls.push(split); return makeLeaf(); },
+    getRightLeaf: split => { rightCalls.push(split); return makeLeaf(); },
+    revealLeaf: leaf => revealed.push(leaf),
+  });
+  return { ...f, detached, leftCalls, rightCalls, revealed, leftSplit, leavesByType, makeLeaf };
+}
+
+test('onunload keeps sidebar views intact instead of detaching them', () => {
+  const f = sidebarFixture();
+  f.plugin.onunload();
+  assert.deepEqual(f.detached, []);
+});
+
+test('activateCalendarView defaults to left sidebar and respects reveal option', async () => {
+  const f = sidebarFixture();
+  await f.plugin.activateCalendarView({ reveal: false });
+  assert.deepEqual(f.leftCalls, [false]);
+  assert.deepEqual(f.rightCalls, []);
+  assert.deepEqual(f.revealed, []);
+
+  const created = f.makeLeaf();
+  f.leavesByType['lucky-calendar'].push(created);
+  await f.plugin.activateCalendarView({ reveal: false });
+  assert.equal(f.leftCalls.length, 1);
+  assert.deepEqual(f.revealed, []);
+
+  await f.plugin.activateCalendarView();
+  assert.equal(f.leftCalls.length, 1);
+  assert.deepEqual(f.revealed, [created]);
+
+  const missing = sidebarFixture();
+  await missing.plugin.activateCalendarView();
+  assert.deepEqual(missing.leftCalls, [false]);
+  assert.deepEqual(missing.rightCalls, []);
+  assert.equal(missing.revealed.length, 1);
+  assert.deepEqual({ ...missing.revealed[0].viewState }, { type: 'lucky-calendar', active: true });
+});
+
+test('activateFileExplorer splits below left calendar only when appropriate and respects reveal', async () => {
+  const calLeaf = { getRoot: null };
+
+  // Desktop: calendar in leftSplit and single tab group -> getLeftLeaf(true)
+  const splitCase = sidebarFixture();
+  calLeaf.getRoot = () => splitCase.leftSplit;
+  splitCase.leavesByType['lucky-calendar'].push(calLeaf);
+  await splitCase.plugin.activateFileExplorer({ reveal: false });
+  assert.deepEqual(splitCase.leftCalls, [true]);
+  assert.deepEqual(splitCase.revealed, []);
+
+  // Mobile: always getLeftLeaf(false), never revealLeaf
+  const mobileCase = sidebarFixture();
+  mobileCase.app.isMobile = true;
+  calLeaf.getRoot = () => mobileCase.leftSplit;
+  mobileCase.leavesByType['lucky-calendar'].push(calLeaf);
+  await mobileCase.plugin.activateFileExplorer();
+  assert.deepEqual(mobileCase.leftCalls, [false]);
+  assert.deepEqual(mobileCase.revealed, []);
+
+  // Desktop with 2+ groups in leftSplit -> getLeftLeaf(false)
+  const multiGroup = sidebarFixture();
+  calLeaf.getRoot = () => multiGroup.leftSplit;
+  multiGroup.leavesByType['lucky-calendar'].push(calLeaf);
+  multiGroup.leftSplit.children.push({ id: 'group-2' });
+  await multiGroup.plugin.activateFileExplorer();
+  assert.deepEqual(multiGroup.leftCalls, [false]);
+  assert.equal(multiGroup.revealed.length, 1);
+  assert.deepEqual({ ...multiGroup.revealed[0].viewState }, { type: 'lucky-files', active: true });
+
+  // Desktop with calendar elsewhere -> getLeftLeaf(false)
+  const otherRoot = sidebarFixture();
+  otherRoot.leavesByType['lucky-calendar'].push({ getRoot: () => ({ other: true }) });
+  await otherRoot.plugin.activateFileExplorer();
+  assert.deepEqual(otherRoot.leftCalls, [false]);
+
+  // Existing file explorer respects reveal flag
+  const existingCase = sidebarFixture();
+  const feLeaf = existingCase.makeLeaf();
+  existingCase.leavesByType['lucky-files'].push(feLeaf);
+  await existingCase.plugin.activateFileExplorer({ reveal: false });
+  assert.deepEqual(existingCase.leftCalls, []);
+  assert.deepEqual(existingCase.revealed, []);
+  await existingCase.plugin.activateFileExplorer();
+  assert.deepEqual(existingCase.revealed, [feLeaf]);
+});
+
+test('hot-reload defers startup view activation so async restore avoids duplicates and unload cancels it', async () => {
+  const f = sidebarFixture();
+  f.app.workspace.layoutReady = true;
+  f.app.workspace.onLayoutReady = fn => fn();
+  f.plugin.initNoteCount = () => {};
+  f.plugin.updateReadingTime = () => {};
+  f.plugin.initTagWrangler = () => {};
+  f.plugin.applyHiderClasses = () => {};
+
+  await f.plugin.onload();
+  assert.equal(f.timers.size, 2);
+  assert.deepEqual(f.leftCalls, []);
+
+  // Async view-registered restores both leaves before timer fires
+  f.leavesByType['lucky-calendar'].push(f.makeLeaf());
+  f.leavesByType['lucky-files'].push(f.makeLeaf());
+  f.expire();
+  await flush();
+  assert.deepEqual(f.leftCalls, []);
+  assert.deepEqual(f.rightCalls, []);
+  assert.deepEqual(f.revealed, []);
+
+  // Unload before timers fire cancels pending startup view checks
+  const g = sidebarFixture();
+  const calls = [];
+  g.app.workspace.layoutReady = true;
+  g.app.workspace.onLayoutReady = fn => fn();
+  g.plugin.initNoteCount = () => {};
+  g.plugin.updateReadingTime = () => {};
+  g.plugin.initTagWrangler = () => {};
+  g.plugin.applyHiderClasses = () => {};
+  g.plugin.activateCalendarView = () => calls.push('cal');
+  g.plugin.activateFileExplorer = () => calls.push('fe');
+
+  await g.plugin.onload();
+  assert.equal(g.timers.size, 2);
+  g.plugin.onunload();
+  assert.equal(g.timers.size, 0);
+  g.expire();
+  assert.deepEqual(calls, []);
+});
+
 module.exports = { fixture, html, deferred, flush };

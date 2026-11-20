@@ -1,6 +1,6 @@
 {
   "name": "lucky-toolkit",
-  "version": "4.0.9",
+  "version": "4.0.10",
   "private": true,
   "description": "Regression and release checks for Lucky Toolkit",
   "scripts": {

@@ -106,6 +106,7 @@ class LuckyToolkit extends Plugin {
     await this.loadSettings();
     if (this._linkTitleUnloaded) return;
     this._noteCountCache = new Map();
+    this._startupViewTimers = new Set();
 
     // --- Feature 1: Hider — apply CSS classes based on settings ---
     this.applyHiderClasses();
@@ -145,9 +146,9 @@ class LuckyToolkit extends Plugin {
       name: '打开日历',
       callback: () => this.activateCalendarView(),
     });
-    this.app.workspace.onLayoutReady(() => {
-      if (!this._linkTitleUnloaded && this.settings.showCalendar) {
-        this.activateCalendarView();
+    this.scheduleStartupView(() => {
+      if (this.settings.showCalendar) {
+        this.activateCalendarView({ reveal: false });
       }
     });
 
@@ -199,9 +200,9 @@ class LuckyToolkit extends Plugin {
       name: '打开文件列表',
       callback: () => this.activateFileExplorer(),
     });
-    this.app.workspace.onLayoutReady(() => {
-      if (!this._linkTitleUnloaded && this.settings.showFileExplorer) {
-        this.activateFileExplorer();
+    this.scheduleStartupView(() => {
+      if (this.settings.showFileExplorer) {
+        this.activateFileExplorer({ reveal: false });
       }
     });
 
@@ -223,6 +224,10 @@ class LuckyToolkit extends Plugin {
   onunload() {
     console.log('Unloading Lucky Toolkit');
     this._linkTitleUnloaded = true;
+    for (const timer of this._startupViewTimers || []) {
+      globalThis.clearTimeout?.(timer);
+    }
+    this._startupViewTimers?.clear();
     for (const operation of this._linkTitleOperations || []) {
       this.replaceLinkTitleOperation(operation, operation.url, true);
       operation.cancelled = true;
@@ -242,10 +247,7 @@ class LuckyToolkit extends Plugin {
     this._refreshNoteCounts?.cancel();
     this._pendingNoteCountPaths?.clear();
     this.removeAllNoteCounts();
-    // Detach calendar view
-    this.app.workspace.detachLeavesOfType(CALENDAR_VIEW_TYPE);
-    // Detach file explorer view
-    this.app.workspace.detachLeavesOfType(FILE_EXPLORER_VIEW_TYPE);
+    // Keep sidebar views intact across plugin reloads/updates; Obsidian detaches registered views automatically when the user disables the plugin.
     // Remove focus mode class
     document.body.removeClass('lucky-focus-mode');
   }
@@ -618,32 +620,63 @@ class LuckyToolkit extends Plugin {
   // Feature 5: Calendar View — activate helper
   // ============================================================
 
-  async activateCalendarView() {
+  scheduleStartupView(callback) {
+    const alreadyReady = !!this.app.workspace.layoutReady;
+    this.app.workspace.onLayoutReady(() => {
+      if (this._linkTitleUnloaded) return;
+      if (!alreadyReady || typeof globalThis.setTimeout !== 'function') {
+        callback();
+        return;
+      }
+      // During hot-reload/re-enable (layoutReady was already true when onload() ran),
+      // Obsidian's view-registered handler restores existing leaves asynchronously by
+      // briefly opening EmptyView before calling setViewState(savedState).
+      // Wait briefly so getLeavesOfType() sees the restored leaf instead of spawning a duplicate.
+      const timer = globalThis.setTimeout(() => {
+        this._startupViewTimers?.delete(timer);
+        if (!this._linkTitleUnloaded) callback();
+      }, 50);
+      this._startupViewTimers?.add(timer);
+    });
+  }
+
+  async activateCalendarView(options = {}) {
+    const reveal = options.reveal !== false;
     const existing = this.app.workspace.getLeavesOfType(CALENDAR_VIEW_TYPE);
     if (existing.length > 0) {
-      if (!this.app.isMobile) this.app.workspace.revealLeaf(existing[0]);
+      if (reveal && !this.app.isMobile) this.app.workspace.revealLeaf(existing[0]);
       return;
     }
-    const leaf = this.app.workspace.getRightLeaf(false);
+    const leaf = this.app.workspace.getLeftLeaf(false);
     if (!leaf) return;
-    await leaf.setViewState({ type: CALENDAR_VIEW_TYPE, active: true });
-    if (!this.app.isMobile) this.app.workspace.revealLeaf(leaf);
+    await leaf.setViewState({ type: CALENDAR_VIEW_TYPE, active: reveal });
+    if (reveal && !this.app.isMobile) this.app.workspace.revealLeaf(leaf);
   }
 
   // ============================================================
   // Feature 12: File Explorer — activate helper
   // ============================================================
 
-  async activateFileExplorer() {
+  async activateFileExplorer(options = {}) {
+    const reveal = options.reveal !== false;
     const existing = this.app.workspace.getLeavesOfType(FILE_EXPLORER_VIEW_TYPE);
     if (existing.length > 0) {
-      if (!this.app.isMobile) this.app.workspace.revealLeaf(existing[0]);
+      if (reveal && !this.app.isMobile) this.app.workspace.revealLeaf(existing[0]);
       return;
     }
-    const leaf = this.app.workspace.getLeftLeaf(false);
+    const leftSplit = this.app.workspace.leftSplit;
+    const calendarInLeft = this.app.workspace
+      .getLeavesOfType(CALENDAR_VIEW_TYPE)
+      .some((leaf) => typeof leaf.getRoot === 'function' && leaf.getRoot() === leftSplit);
+    const splitBelowCalendar =
+      !this.app.isMobile &&
+      calendarInLeft &&
+      Array.isArray(leftSplit?.children) &&
+      leftSplit.children.length === 1;
+    const leaf = this.app.workspace.getLeftLeaf(splitBelowCalendar);
     if (!leaf) return;
-    await leaf.setViewState({ type: FILE_EXPLORER_VIEW_TYPE, active: true });
-    if (!this.app.isMobile) this.app.workspace.revealLeaf(leaf);
+    await leaf.setViewState({ type: FILE_EXPLORER_VIEW_TYPE, active: reveal });
+    if (reveal && !this.app.isMobile) this.app.workspace.revealLeaf(leaf);
   }
 
   // ============================================================
@@ -1971,7 +2004,7 @@ class LuckyToolkitSettingTab extends PluginSettingTab {
 
     new Setting(containerEl)
       .setName('启用日历')
-      .setDesc('在右侧栏显示月历，点击日期打开/创建日记。')
+      .setDesc('在左侧栏显示月历，点击日期打开/创建日记。')
       .addToggle((toggle) =>
         toggle.setValue(this.plugin.settings.showCalendar).onChange(async (value) => {
           this.plugin.settings.showCalendar = value;
